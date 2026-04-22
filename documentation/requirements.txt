@@ -1,0 +1,13 @@
+tqdm
+Sphinx
+sphinx-book-theme
+sphinx-copybutton
+sphinx-autodoc-typehints
+ipykernel
+sphinx_togglebutton
+sphinx_design
+myst-nb
+nbsphinx
+Pygments
+jax
+jaxlib
