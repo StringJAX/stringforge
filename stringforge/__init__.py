@@ -121,6 +121,7 @@ def set_vault_repo(repo_id):
 
 from .cy_io import *
 from .lcs_database import *
+from .kklt_database import *
 from .vacua_writer import *
 from .vacuavault import *
 

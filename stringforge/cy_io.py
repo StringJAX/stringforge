@@ -149,8 +149,9 @@ def _resolve_vault_dir() -> Path:
 
 
 _DATASET_CONFIGS: Dict[str, str] = {
-    "tdf":  "KS",
-    "cicy": "CICY",
+    "tdf":        "KS",
+    "cicy":       "CICY",
+    "kklt_vacua": "KKLT",
 }
 
 SCHEMA_VERSION: int = 1
@@ -158,7 +159,15 @@ SCHEMA_VERSION: int = 1
 SCHEMA_CHANGELOG: Dict[int, str] = {
     1: "Initial versioned schema. Conifold basis-change matrix stored as "
        "'basis_change' column; 'n_conifolds' and 'D3_tadpole' added to "
-       "catalog.parquet; conifold_catalog.parquet introduced.",
+       "catalog.parquet; conifold_catalog.parquet introduced.  "
+       "The 'kklt_vacua' sub-dataset adopts v1 with an extended catalog "
+       "layout: polytope-grain catalog.parquet (one row per ks_id) with "
+       "n_rigids_dual / Q / n_coni_classes; conifold_class_catalog.parquet "
+       "keyed by (ks_id, coni_class_id); conifold_catalog.parquet keyed by "
+       "(ks_id, coni_class_id, coni_id) carrying the logical TDF link "
+       "(triang_id, tdf_conifold_id); run_log.parquet for cluster-run "
+       "tracking; schema.json carries a TDF-compat fingerprint "
+       "(tdf_schema_version, tdf_catalog_sha256).",
 }
 
 class SchemaVersionError(RuntimeError):
