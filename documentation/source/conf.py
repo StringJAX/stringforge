@@ -17,14 +17,35 @@ release = version
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
     "sphinx_copybutton",
     "sphinx_togglebutton",
     "sphinx_design",
     "sphinx_autodoc_typehints",
+    "sphinxcontrib.mermaid",
     "myst_nb",
 ]
+
+# -- Autosummary -------------------------------------------------------------
+
+autosummary_generate = True
+
+# -- Intersphinx -------------------------------------------------------------
+
+# Cross-package links go here.  Sibling-package mappings are added as each
+# package's docs go public; until then those references will report missing
+# at build time but will not block the build.
+intersphinx_mapping = {
+    "python":   ("https://docs.python.org/3", None),
+    "numpy":    ("https://numpy.org/doc/stable/", None),
+    "jax":      ("https://docs.jax.dev/en/latest/", None),
+    "jaxvacua": ("https://jaxvacua.readthedocs.io/en/latest/", None),
+    # "cytools":   ("https://cy.tools/",                             None),  # add when stable RTD URL exists
+    # "kahlerjax": ("https://kahlerjax.readthedocs.io/en/latest/",    None),  # add when public
+    # "jaxiverse": ("https://jaxiverse.readthedocs.io/en/latest/",    None),  # add when public
+}
 
 source_suffix = {
     ".rst": "restructuredtext",

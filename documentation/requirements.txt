@@ -6,8 +6,13 @@ sphinx-autodoc-typehints
 ipykernel
 sphinx_togglebutton
 sphinx_design
+sphinxcontrib-mermaid
 myst-nb
 nbsphinx
 Pygments
 jax
 jaxlib
+# Imported by tutorial notebooks; required at build time so the imports resolve.
+# `jaxpolylog`, `kahlerjax`, `jaxiverse` will be added when on PyPI.  Until then,
+# their imports in `ecosystem_pipeline.ipynb` are commented out.
+jaxvacua
