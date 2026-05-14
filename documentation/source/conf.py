@@ -1,12 +1,12 @@
 # Configuration file for the Sphinx documentation builder.
-# StringJAX — unified ecosystem documentation.
+# StringForge — unified ecosystem documentation.
 
 import os
 import sys
 
 # -- Project information -----------------------------------------------------
 
-project = "StringJAX"
+project = "StringForge"
 copyright = "2026, Andreas Schachner"
 author = "Andreas Schachner"
 version = "0.1.0"
@@ -70,10 +70,10 @@ myst_enable_extensions = [
 
 html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
-html_title = "StringJAX"
+html_title = "StringForge"
 
 html_theme_options = {
-    "repository_url": "https://github.com/AndreasSchachner/stringjax",
+    "repository_url": "https://github.com/AndreasSchachner/stringforge",
     "use_repository_button": True,
     "use_issues_button": True,
     "show_toc_level": 2,

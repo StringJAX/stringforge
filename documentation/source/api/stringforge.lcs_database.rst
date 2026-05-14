@@ -1,15 +1,15 @@
-stringjax.lcs_database
+stringforge.lcs_database
 ========================
 
-.. currentmodule:: stringjax.lcs_database
+.. currentmodule:: stringforge.lcs_database
 
-.. automodule:: stringjax.lcs_database
+.. automodule:: stringforge.lcs_database
 
 
 Database class
 -----------------------------------
 
-Extends :class:`stringjax.cy_io.CYDatabase` with model construction
+Extends :class:`stringforge.cy_io.CYDatabase` with model construction
 (``lcs_tree`` / ``FluxVacuaFinder``) and vacua-writing delegation.  This is
 the canonical user-facing database class.
 

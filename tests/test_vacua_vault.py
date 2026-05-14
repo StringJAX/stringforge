@@ -3,13 +3,13 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 r"""
-Tests for the ``stringjax.vacuavault`` subpackage:
+Tests for the ``stringforge.vacuavault`` subpackage:
 
 - Schema / parquet-level validation (``validate_parquet_file``).
 - Row-level split for ``partial_failure="split"`` mode.
 - Catalog regeneration from a synthetic repo tree.
 - Community → curated promotion (file move + attribution preservation).
-- CLI dispatch via ``python -m stringjax.vacuavault``.
+- CLI dispatch via ``python -m stringforge.vacuavault``.
 
 These tests build a fake local vault repo under a ``tempfile.mkdtemp()``
 so no network access is required.  They do not test
@@ -30,12 +30,12 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-# Resolve the stringjax package from the repo root (one level up from
+# Resolve the stringforge package from the repo root (one level up from
 # ``tests/``) so ``python -m unittest`` works without requiring
 # ``pip install -e .`` first.
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from stringjax.vacuavault import (
+from stringforge.vacuavault import (
     validate_parquet_file,
     split_by_validation,
     rebuild_catalog,
@@ -89,7 +89,7 @@ def _write_parquet_with_metadata(df: pd.DataFrame, path: Path,
 # ----------------------------------------------------------------------------
 
 class TestSchemaValidation(unittest.TestCase):
-    r"""Tests for :func:`stringjax.vacuavault.validate_parquet_file`."""
+    r"""Tests for :func:`stringforge.vacuavault.validate_parquet_file`."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="jvc_vault_test_"))
@@ -482,14 +482,14 @@ class TestCurateSubmission(unittest.TestCase):
 
 
 class TestCLIEntryPoint(unittest.TestCase):
-    r"""Smoke test that ``python -m stringjax.vacuavault`` dispatches."""
+    r"""Smoke test that ``python -m stringforge.vacuavault`` dispatches."""
 
     def test_help_exits_clean(self):
         # Run from the repo root so the subprocess finds the in-repo
-        # ``stringjax`` package without requiring ``pip install -e .``.
+        # ``stringforge`` package without requiring ``pip install -e .``.
         repo_root = Path(__file__).resolve().parent.parent
         res = subprocess.run(
-            [sys.executable, "-m", "stringjax.vacuavault", "--help"],
+            [sys.executable, "-m", "stringforge.vacuavault", "--help"],
             cwd=str(repo_root),
             capture_output=True, text=True,
         )

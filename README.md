@@ -1,8 +1,8 @@
-# StringJAX
+# StringForge
 
 **Differentiable tools for string compactifications with JAX.**
 
-StringJAX is a Python framework for the systematic construction and analysis of string vacua, built natively on [JAX](https://github.com/google/jax). It provides a unified computational pipeline from Calabi–Yau compactification data to four-dimensional effective field theories, vacuum solutions, and physical observables — with automatic differentiation, just-in-time compilation, and hardware acceleration throughout.
+StringForge is a Python framework for the systematic construction and analysis of string vacua, built natively on [JAX](https://github.com/google/jax). It provides a unified computational pipeline from Calabi–Yau compactification data to four-dimensional effective field theories, vacuum solutions, and physical observables — with automatic differentiation, just-in-time compilation, and hardware acceleration throughout.
 
 The framework is designed to turn the study of string compactifications from a largely case-by-case enterprise into a scalable, reproducible computational discipline. It combines curated databases of geometric and topological input data with efficient numerical tools for repeated sampling, optimisation, and stability analysis, enabling ensemble-level investigations of the string landscape.
 
@@ -38,7 +38,7 @@ At the base sits the `lcs_tree` — a JAX-registered pytree that separates stati
 
 ## Packages
 
-StringJAX is an umbrella framework comprising the following packages:
+StringForge is an umbrella framework comprising the following packages:
 
 | Package | Description | Status |
 |---------|-------------|--------|
@@ -121,26 +121,26 @@ fluxes_isd = ISD_sampling(z0, tau0, np.random.randint(-3, 4, (N, model.n_fluxes)
 
 ```bash
 # Create and activate a virtual environment (recommended)
-python -m venv stringjax-env && source stringjax-env/bin/activate
+python -m venv stringforge-env && source stringforge-env/bin/activate
 
 # Install from GitHub
-pip install -e "git+https://github.com/AndreasSchachner/stringjax.git#egg=stringjax"
+pip install -e "git+https://github.com/AndreasSchachner/stringforge.git#egg=stringforge"
 
 # Or clone and install locally (recommended for development)
-git clone --recurse-submodules https://github.com/AndreasSchachner/stringjax.git
-cd stringjax
+git clone --recurse-submodules https://github.com/AndreasSchachner/stringforge.git
+cd stringforge
 pip install -e .
 ```
 
 > [!CAUTION]
-> StringJAX requires `float64` precision. [JAX Metal](https://developer.apple.com/metal/jax/) on macOS does not support `float64` and is therefore incompatible. Use the CPU backend on Mac.
+> StringForge requires `float64` precision. [JAX Metal](https://developer.apple.com/metal/jax/) on macOS does not support `float64` and is therefore incompatible. Use the CPU backend on Mac.
 
 > [!NOTE]
 > When using the [CYTools](https://cy.tools) Docker image, check compatibility with the required NumPy and JAX versions.
 
 ## Documentation
 
-The StringJAX ecosystem documentation — including package overviews, tutorials, and an ecosystem-pipeline walkthrough — can be built from the `documentation/` folder in this repository. The full JAXVacua API reference is available at [jaxvacua.readthedocs.io](https://jaxvacua.readthedocs.io).
+The StringForge ecosystem documentation — including package overviews, tutorials, and an ecosystem-pipeline walkthrough — can be built from the `documentation/` folder in this repository. The full JAXVacua API reference is available at [jaxvacua.readthedocs.io](https://jaxvacua.readthedocs.io).
 
 To build the documentation locally:
 
@@ -171,9 +171,9 @@ Optional:
 If you find this work useful, please cite:
 
 ```bibtex
-@article{Schachner:2026stringjax,
+@article{Schachner:2026stringforge,
     author = "Schachner, Andreas",
-    title = "{StringJAX --- Differentiable Tools for String Compactifications}",
+    title = "{StringForge --- Differentiable Tools for String Compactifications}",
     eprint = "",
     archivePrefix = "arXiv",
     primaryClass = "hep-th",

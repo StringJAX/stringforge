@@ -1,5 +1,5 @@
 # ==============================================================================
-# jaxvacua / vacua_writer
+# stringforge / vacua_writer
 #
 # Vacua persistence layer — writes designated vacua to disk, retracts/purges
 # them, uploads and fetches from the community HuggingFace vault, and runs
@@ -8,19 +8,13 @@
 # `__getattr__`, so method bodies that read `self.cache_dir`, `self._fetch_*`,
 # `self._catalog`, etc. keep working unchanged.
 #
-# Method names are **kept identical** to the originals on `CYDatabase` for
-# Phase-1 compatibility (e.g. `designate_vacua`, `push_vacua_to_hub`).  The
-# `LCSDatabase` layer in `lcs_database.py` forwards its own methods of the same
-# names to these.  Renaming the public surface (e.g. `VacuaWriter.designate`)
-# can happen in a later phase.
+# Method names are kept identical to the originals on `CYDatabase` (e.g.
+# `designate_vacua`, `push_vacua_to_hub`).  The `LCSDatabase` layer in
+# `lcs_database.py` forwards its own methods of the same names to these.
 #
-# No imports from `lcs_tree` / `flux_eft` / `flux_vacua_finder` at module load —
-# any physics dependency is imported lazily inside the method that needs it
-# (mirrors today's behaviour).
-#
-# This file was produced by the Phase-1 refactor of the original
-# `jaxvacua/database.py`.  The bodies are copied verbatim; consult database.py
-# for the authoritative code until Phase 3 deletes the original.
+# No imports from `lcs_tree` / `flux_eft` / `flux_vacua_finder` at module
+# load — any physics dependency is imported lazily inside the method that
+# needs it.
 # ==============================================================================
 
 from __future__ import annotations
@@ -40,7 +34,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
 
 # The vacua layer depends on the pure-I/O layer for constants, exceptions and
-# helpers (all of which live in stringjax.cy_io after the 2026-04-30 split).
+# helpers (all of which live in stringforge.cy_io after the 2026-04-30 split).
 # We re-import the ones the method bodies reference.
 from .cy_io import (
     SCHEMA_VERSION,
@@ -697,13 +691,13 @@ class _VacuaStreamWriter:
 class VacuaWriter:
     """Vacua persistence / HuggingFace-upload handler.
 
-    Wraps a :class:`stringjax.cy_io.CYDatabase` (or any subclass) and delegates
+    Wraps a :class:`stringforge.cy_io.CYDatabase` (or any subclass) and delegates
     all data-access calls — catalog reads, shard fetches, path resolution — to
     the wrapped instance via :meth:`__getattr__`.  This keeps the extracted
     method bodies untouched from their original `CYDatabase` form.
 
     Construct with ``VacuaWriter(db)`` where ``db`` is an instance of
-    :class:`stringjax.cy_io.CYDatabase` (or any class implementing the same
+    :class:`stringforge.cy_io.CYDatabase` (or any class implementing the same
     I/O surface — e.g. :class:`jaxvacua.lcs_database.LCSDatabase`).
     """
 
@@ -1490,7 +1484,7 @@ class VacuaWriter:
         **Description:**
         Upload a batch of vacuum solutions to the HuggingFace
         ``aschachner/vacua_vault`` dataset repository (or an override
-        via *repo_id* / ``STRINGJAX_VAULT_REPO``).
+        via *repo_id* / ``STRINGFORGE_VAULT_REPO``).
 
         The upload lands inside the target model's ``community/``
         directory: ``tdf/h12_{N}/ks_{X}_tri_{Y}/community/{hf_username}_{label}.parquet``

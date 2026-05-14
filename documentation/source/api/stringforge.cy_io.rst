@@ -1,9 +1,9 @@
-stringjax.cy_io
+stringforge.cy_io
 ==================
 
-.. currentmodule:: stringjax.cy_io
+.. currentmodule:: stringforge.cy_io
 
-.. automodule:: stringjax.cy_io
+.. automodule:: stringforge.cy_io
 
 
 Database classes
@@ -13,7 +13,7 @@ Pure-I/O classes for reading the HuggingFace-hosted ``cy-database``.  These
 classes have **no downstream-package dependencies** and serve as the shared
 geometry-database layer for jaxvacua, kahlerjax, and other sibling packages.
 For model construction (``lcs_tree`` / ``FluxVacuaFinder``) and vacua
-persistence, see ``jaxvacua.lcs_database`` and ``jaxvacua.vacua_writer``.
+persistence, see ``stringforge.lcs_database`` and ``stringforge.vacua_writer``.
 
 .. autosummary::
     :toctree: _autosummary

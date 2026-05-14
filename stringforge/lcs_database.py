@@ -1,26 +1,20 @@
 # ==============================================================================
-# jaxvacua / lcs_database
+# stringforge / lcs_database
 #
 # LCSDatabase — extends cy_io.CYDatabase with:
 #
 #   (a) methods that construct :class:`jaxvacua.lcs.lcs_tree` objects and
 #       :class:`jaxvacua.flux_vacua_finder.FluxVacuaFinder` instances from
 #       parquet-row data (load, load_from_conifold_row, load_model, load_batch,
-#       iter_batch, sample, plus new batch-model methods load_model_batch and
-#       iter_model_batch);
+#       iter_batch, sample, plus the batch-model variants load_model_batch
+#       and iter_model_batch);
 #
 #   (b) a filter-keyed cache of the last constructed batch of FluxVacuaFinder
 #       instances (cached_models property, clear_cached_models method);
 #
 #   (c) vacua-persistence delegation — `db.designate_vacua(...)` and friends
-#       forward to a lazily-built :class:`jaxvacua.vacua_writer.VacuaWriter`
+#       forward to a lazily-built :class:`stringforge.vacua_writer.VacuaWriter`
 #       held on the instance.
-#
-# Method bodies for (a) are copied verbatim from the original CYDatabase;
-# (b) and (c) are new code.
-#
-# This file was produced by the Phase-1 refactor of the original
-# `jaxvacua/database.py`.
 # ==============================================================================
 
 from __future__ import annotations

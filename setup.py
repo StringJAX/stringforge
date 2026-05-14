@@ -1,21 +1,21 @@
 from setuptools import setup
 
 setup(
-    name='stringjax',
+    name='stringforge',
     version='0.0.2',
     description='Differentiable tools for string compactifications with JAX.',
     author='Andreas Schachner',
     author_email='as3475@cornell.edu',
-    url='https://github.com/AndreasSchachner/stringjax',
+    url='https://github.com/AndreasSchachner/stringforge',
     # Top-level package + the vacuavault subpackage (server-side
     # validation/curation tooling for the HF dataset repo).
-    packages=['stringjax', 'stringjax.vacuavault'],
+    packages=['stringforge', 'stringforge.vacuavault'],
     python_requires='>=3.12',
     # NOTE: jaxvacua/kahlerjax/jaxiverse intentionally do NOT live in
     # install_requires — those are *downstream* sibling packages that
-    # depend on stringjax (not the other way round).  Listing them as
+    # depend on stringforge (not the other way round).  Listing them as
     # hard deps would create a circular pip dependency.  They're
-    # surfaced lazily via try/except in stringjax/__init__.py and via
+    # surfaced lazily via try/except in stringforge/__init__.py and via
     # the ``[full]`` extra below for users who want one-shot install.
     install_requires=[
         'numpy',

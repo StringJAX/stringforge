@@ -1,10 +1,10 @@
 # CYTools
 
 **Toric Calabi–Yau geometry library — external dependency, not part of the
-StringJAX umbrella.**
+StringForge umbrella.**
 
 [CYTools](https://cy.tools) is the upstream geometry library on which the
-StringJAX ecosystem builds. It provides numerical tools for working with toric
+StringForge ecosystem builds. It provides numerical tools for working with toric
 varieties, lattice polytopes, triangulations, and Calabi–Yau hypersurfaces /
 complete intersections derived from them. Within the ecosystem, CYTools is the
 canonical input layer: most pipelines start from a `cytools.Polytope` or
@@ -24,7 +24,7 @@ External public dependency.
   `CalabiYau`) for divisor / orientifold computations.
 - **`jaxiverse`** — uses `cytools.calabiyau.CalabiYau` and monkey-patches a
   `.jaxion(...)` convenience method onto it.
-- **`stringjax`** — does not directly depend on cytools at runtime; the
+- **`stringforge`** — does not directly depend on cytools at runtime; the
   `LCSDatabase` and vacua-vault layers operate on already-loaded data.
 
 ## Compatibility notes

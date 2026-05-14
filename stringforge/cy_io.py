@@ -1,18 +1,15 @@
 # ==============================================================================
-# jaxvacua / cy_io
+# stringforge / cy_io
 #
 # Pure-I/O layer for the HuggingFace-hosted cy-database.  Contains the core
 # CYDatabase class and the two sub-dataset convenience subclasses (TDFDatabase,
 # CICYDatabase) along with parquet / HF download plumbing, caching, catalog
 # queries, and schema versioning.
 #
-# No imports from other jaxvacua modules — this file is deliberately kept
-# standalone so it can be extracted into its own PyPI package later.
-#
-# This file was produced by the Phase-1 refactor of the original
-# `jaxvacua/database.py` (see /Users/andreasschachner/.claude/plans/).
-# Bodies are copied verbatim; consult database.py for the authoritative code
-# until Phase 3 deletes the original.
+# Sits at the dependency root of the stringforge package — vacua_writer and
+# lcs_database import from this module, not the other way round.  Also free of
+# jaxvacua imports, so the sibling package can read/write the cache without
+# circular dependencies.
 # ==============================================================================
 
 import datetime
@@ -27,18 +24,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
-HF_REPO_ID: str = os.environ.get("STRINGJAX_HF_REPO", "aschachner/cy-database")
+HF_REPO_ID: str = os.environ.get("STRINGFORGE_HF_REPO", "aschachner/cy-database")
 
 _CACHE_SIZE_WARNING_MB: int = 500
 
 def _get_default_data_dir() -> str:
     r"""
     **Description:**
-    Return the current global data directory from ``stringjax.data_dir``.
+    Return the current global data directory from ``stringforge.data_dir``.
 
-    Falls back to ``~/.stringjax_cache`` if the package-level global
+    Falls back to ``~/.stringforge_cache`` if the package-level global
     isn't set yet (i.e. when ``cy_io`` is imported before
-    ``stringjax/__init__.py`` finishes executing, or when the module
+    ``stringforge/__init__.py`` finishes executing, or when the module
     is used standalone for some reason).
 
     Returns:
@@ -48,7 +45,7 @@ def _get_default_data_dir() -> str:
         from . import data_dir
         return data_dir
     except ImportError:
-        return os.path.join(Path.home(), ".stringjax_cache")
+        return os.path.join(Path.home(), ".stringforge_cache")
 
 
 DEFAULT_CACHE_DIR: str = _get_default_data_dir()
@@ -61,18 +58,18 @@ def _resolve_vault_repo() -> str:
     r"""
     **Description:**
     Return the HuggingFace dataset repo ID for vacua uploads.  Honours
-    ``STRINGJAX_VAULT_REPO`` env var, falling back to
+    ``STRINGFORGE_VAULT_REPO`` env var, falling back to
     :data:`DEFAULT_VAULT_REPO`.
     """
-    return os.environ.get("STRINGJAX_VAULT_REPO", DEFAULT_VAULT_REPO)
+    return os.environ.get("STRINGFORGE_VAULT_REPO", DEFAULT_VAULT_REPO)
 
 
-def _find_stringjax_repo_root(start: Optional[Path] = None) -> Optional[Path]:
+def _find_stringforge_repo_root(start: Optional[Path] = None) -> Optional[Path]:
     r"""
     **Description:**
-    Walk up from *start* (default: cwd) looking for a stringjax source
+    Walk up from *start* (default: cwd) looking for a stringforge source
     checkout.  A directory counts as the repo root when it contains both
-    a ``setup.py`` with ``name="stringjax"`` and a ``stringjax/``
+    a ``setup.py`` with ``name="stringforge"`` and a ``stringforge/``
     package directory.
 
     Args:
@@ -85,13 +82,13 @@ def _find_stringjax_repo_root(start: Optional[Path] = None) -> Optional[Path]:
     current = Path(start or os.getcwd()).resolve()
     for candidate in [current, *current.parents]:
         setup_py = candidate / "setup.py"
-        pkg_dir  = candidate / "stringjax"
+        pkg_dir  = candidate / "stringforge"
         if setup_py.is_file() and pkg_dir.is_dir():
             try:
                 text = setup_py.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            if 'name="stringjax"' in text or "name='stringjax'" in text:
+            if 'name="stringforge"' in text or "name='stringforge'" in text:
                 return candidate
     return None
 
@@ -104,13 +101,13 @@ def _resolve_vault_dir() -> Path:
 
     Resolution order — uses whichever stage succeeds first:
 
-    1. **``STRINGJAX_VAULT`` env var** — explicit override. Recommended
-       for any real workflow.  Set via ``export STRINGJAX_VAULT=...``,
-       ``os.environ["STRINGJAX_VAULT"] = ...``, or
-       :func:`stringjax.set_vault_dir`.
-    2. **stringjax source checkout** — walks up from cwd looking for a
-       directory containing ``setup.py`` (with ``name="stringjax"``) and
-       a ``stringjax/`` package directory.  Returns
+    1. **``STRINGFORGE_VAULT`` env var** — explicit override. Recommended
+       for any real workflow.  Set via ``export STRINGFORGE_VAULT=...``,
+       ``os.environ["STRINGFORGE_VAULT"] = ...``, or
+       :func:`stringforge.set_vault_dir`.
+    2. **stringforge source checkout** — walks up from cwd looking for a
+       directory containing ``setup.py`` (with ``name="stringforge"``) and
+       a ``stringforge/`` package directory.  Returns
        ``<repo_root>/vacua_vault/``.
     3. **No fallback.**  Raises :class:`LookupError` with explicit
        instructions for how to configure the vault.  This is
@@ -127,27 +124,27 @@ def _resolve_vault_dir() -> Path:
         Path: Absolute path to the vault directory (may not exist yet).
 
     Raises:
-        LookupError: If neither ``STRINGJAX_VAULT`` is set nor cwd is
-            inside a stringjax source checkout.
+        LookupError: If neither ``STRINGFORGE_VAULT`` is set nor cwd is
+            inside a stringforge source checkout.
     """
-    override = os.environ.get("STRINGJAX_VAULT")
+    override = os.environ.get("STRINGFORGE_VAULT")
     if override:
         return Path(override).expanduser().resolve()
 
-    repo_root = _find_stringjax_repo_root()
+    repo_root = _find_stringforge_repo_root()
     if repo_root is not None:
         return repo_root / VAULT_DIRNAME
 
     raise LookupError(
         "Could not resolve a vault directory.\n\n"
-        "  STRINGJAX_VAULT env var:  not set\n"
-        "  stringjax repo root:      not found in cwd or any parent\n\n"
+        "  STRINGFORGE_VAULT env var:  not set\n"
+        "  stringforge repo root:      not found in cwd or any parent\n\n"
         "Set the vault explicitly:\n"
-        "  - export STRINGJAX_VAULT=/path/to/vault\n"
-        "  - stringjax.set_vault_dir('/path/to/vault')\n"
-        "  - os.environ['STRINGJAX_VAULT'] = '/path/to/vault'\n\n"
+        "  - export STRINGFORGE_VAULT=/path/to/vault\n"
+        "  - stringforge.set_vault_dir('/path/to/vault')\n"
+        "  - os.environ['STRINGFORGE_VAULT'] = '/path/to/vault'\n\n"
         "To opt into a cwd-local vault for a quick demo, set\n"
-        "STRINGJAX_VAULT=. (or any explicit path)."
+        "STRINGFORGE_VAULT=. (or any explicit path)."
     )
 
 
@@ -489,10 +486,10 @@ class CYDatabase:
                 ``"org/repo-name"``.  Defaults to :data:`HF_REPO_ID`.
             cache_dir (str | None): Local directory for cached parquet
                 files and vacua storage.  If ``None`` (default), uses the
-                global ``jaxvacua.data_dir`` (which defaults to
-                ``{cwd}/.jaxvacua`` and can be overridden via
-                :func:`jaxvacua.set_data_dir` or the
-                ``STRINGJAX_DATA_DIR`` environment variable).
+                global ``stringforge.data_dir`` (which defaults to
+                ``{cwd}/.stringforge_cache`` and can be overridden via
+                :func:`stringforge.set_data_dir` or the
+                ``STRINGFORGE_DATA_DIR`` environment variable).
             offline (bool): If ``True``, only serve data from the local
                 cache and raise an error on any cache miss.  Defaults to
                 ``False``.
@@ -665,7 +662,7 @@ class CYDatabase:
                 if v > stored
             )
             raise SchemaVersionError(
-                f"Local cache has schema v{stored}, but jaxvacua expects "
+                f"Local cache has schema v{stored}, but stringforge expects "
                 f"v{SCHEMA_VERSION}.\n"
                 f"Changes since your cached version:\n{changes}\n"
                 f"Run db.clear_cache() to delete the stale cache and "
@@ -673,9 +670,9 @@ class CYDatabase:
             )
 
         raise SchemaVersionError(
-            f"Local cache has schema v{stored}, but this version of jaxvacua "
+            f"Local cache has schema v{stored}, but this version of stringforge "
             f"only supports up to v{SCHEMA_VERSION}.  "
-            f"Please upgrade jaxvacua."
+            f"Please upgrade stringforge."
         )
 
     def clear_cache(
@@ -712,7 +709,7 @@ class CYDatabase:
         :meth:`load` call expects the directory to exist.  Pass
         ``remove_dir=True`` to also remove the parent directory itself
         (use this when you're done with the database for good and want
-        ``.stringjax_cache/`` gone from your filesystem).
+        ``.stringforge_cache/`` gone from your filesystem).
 
         Args:
             include_vacua (bool): If True, also delete the
@@ -772,8 +769,8 @@ class CYDatabase:
         # outright.  When ``remove_dir=True``, leave it gone — the
         # directory will be recreated on demand by the next write or
         # download.  Also prune empty parent directories *one level up*
-        # (e.g. when ``cache_dir`` is ``.stringjax_cache/tdf``, take
-        # ``.stringjax_cache`` down too if it now sits empty).  Never
+        # (e.g. when ``cache_dir`` is ``.stringforge_cache/tdf``, take
+        # ``.stringforge_cache`` down too if it now sits empty).  Never
         # cross above one level — protects against accidental cleanup
         # of unrelated directories the user happened to put in the
         # parent.
@@ -815,7 +812,7 @@ class CYDatabase:
             return
         if total > _CACHE_SIZE_WARNING_MB * 1024 * 1024:
             warnings.warn(
-                f"jaxvacua data directory at '{self.cache_dir}' is "
+                f"stringforge data directory at '{self.cache_dir}' is "
                 f"{total / 1024**2:.0f} MB. "
                 f"Use db.clear_cache() to free space.",
                 stacklevel=3,
@@ -1527,13 +1524,13 @@ class CYDatabase:
             return legacy
         return vault
 
-    # `_resolve_vacua_dir` was moved to jaxvacua.vacua_writer.VacuaWriter —
+    # `_resolve_vacua_dir` was moved to stringforge.vacua_writer.VacuaWriter —
     # it depends on `_extract_model_identity`, which reads `lcs_tree`
     # attributes and therefore cannot live in this jaxvacua-dep-free layer.
     # Callers that used to do `db._resolve_vacua_dir(model=...)` should use
     # `VacuaWriter(db)._resolve_vacua_dir(model=...)` instead.  The delegated
-    # method on LCSDatabase (jaxvacua/lcs_database.py) still exposes it for
-    # convenience.
+    # method on LCSDatabase (stringforge/lcs_database.py) still exposes it
+    # for convenience.
 
     def _ensure_designated_catalog(self) -> None:
         r"""Load designated vacua catalog from disk if not yet in memory."""

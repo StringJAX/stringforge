@@ -168,7 +168,7 @@ def validate_parquet_file(
     Load a parquet file and validate it against the vault schema.
 
     Performs the same row-level checks as
-    :meth:`jaxvacua.database.CYDatabase.validate_vacua`, plus an
+    :meth:`stringforge.cy_io.CYDatabase.validate_vacua`, plus an
     identity-homogeneity check (one model per file — see the module
     docstring for context) and an optional auto-load path that
     reconstructs the model from row identity when physics checks

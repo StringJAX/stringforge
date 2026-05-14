@@ -1,9 +1,9 @@
-stringjax.vacuavault
+stringforge.vacuavault
 =======================
 
-.. currentmodule:: stringjax.vacuavault
+.. currentmodule:: stringforge.vacuavault
 
-.. automodule:: stringjax.vacuavault
+.. automodule:: stringforge.vacuavault
 
 
 Server-side tooling for the HuggingFace ``vacua_vault`` dataset
@@ -41,7 +41,7 @@ Validation
 The user-facing validator runs schema, identity, and (optional)
 physics checks against a single parquet file.  Pure dependency
 injection: callers wanting physics validation pass ``db=`` and
-``model_hash_fn=`` themselves; ``stringjax.vacuavault`` never
+``model_hash_fn=`` themselves; ``stringforge.vacuavault`` never
 imports a downstream package.
 
 .. autosummary::
@@ -54,7 +54,7 @@ imports a downstream package.
 Server-side CI helpers
 -----------------------------------
 
-Run via ``python -m stringjax.vacuavault {validate | rebuild_catalog | curate}``
+Run via ``python -m stringforge.vacuavault {validate | rebuild_catalog | curate}``
 on the HF dataset repo.  Schema-only by default; physics-aware
 variants live in downstream-package wrappers (e.g. a
 ``jaxvacua-vault`` CLI in :mod:`jaxvacua` that injects an
@@ -75,7 +75,7 @@ Schema-only validation from Python:
 
 .. code-block:: python
 
-    from stringjax import vacuavault as vv
+    from stringforge import vacuavault as vv
 
     result = vv.validate_parquet_file(
         "tdf/h12_2/ks_29_tri_0/SUSY_Nmax34.parquet",
@@ -87,9 +87,9 @@ Physics-aware validation (caller supplies the database):
 
 .. code-block:: python
 
-    from stringjax import vacuavault as vv
-    from jaxvacua.lcs_database import LCSDatabase
-    from jaxvacua.vacua_writer import _compute_model_hash
+    from stringforge import vacuavault as vv
+    from stringforge.lcs_database import LCSDatabase
+    from stringforge.vacua_writer import _compute_model_hash
 
     db = LCSDatabase(dataset="tdf")
     result = vv.validate_parquet_file(
@@ -103,15 +103,15 @@ CLI (server-side, run from the HF dataset repo root):
 
 .. code-block:: bash
 
-    python -m stringjax.vacuavault validate --base-branch main
-    python -m stringjax.vacuavault rebuild_catalog --repo-path .
-    python -m stringjax.vacuavault curate community/alice_dS_v2.parquet
+    python -m stringforge.vacuavault validate --base-branch main
+    python -m stringforge.vacuavault rebuild_catalog --repo-path .
+    python -m stringforge.vacuavault curate community/alice_dS_v2.parquet
 
 
 See also
 -----------------------------------
 
-* :doc:`stringjax.cy_io` — the geometry-database I/O layer that
+* :doc:`stringforge.cy_io` — the geometry-database I/O layer that
   ``vacuavault`` reads schema constants from.
-* The dataset card at ``stringjax/vacua_vault/vacua_vault_dataset_card.md``
+* The dataset card at ``stringforge/vacua_vault/vacua_vault_dataset_card.md``
   for the public-facing schema and contribution workflow.

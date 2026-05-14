@@ -1,6 +1,6 @@
 # Ecosystem overview
 
-**StringJAX** is the umbrella framework for a family of JAX-based packages targeting
+**StringForge** is the umbrella framework for a family of JAX-based packages targeting
 string compactifications, Calabi–Yau geometry, and 4-D effective field theories.
 Each sibling package owns one layer of the compactification problem; this site
 documents the shared infrastructure that ties them together (catalog I/O, vacua
@@ -20,9 +20,9 @@ documentation.
 ## Dependency diagram
 
 The graph below shows code-level dependencies (solid edges) and the umbrella
-aggregation (the `stringjax` cluster). `cytools` and `jaxpolylog` are leaves;
+aggregation (the `stringforge` cluster). `cytools` and `jaxpolylog` are leaves;
 `kahlerjax` is consumed by `jaxiverse`; `jaxvacua` stands as its own pillar and
-is consumed only via `stringjax`'s shared infrastructure.
+is consumed only via `stringforge`'s shared infrastructure.
 
 ```{mermaid}
 graph TD
@@ -32,7 +32,7 @@ graph TD
   jaxpolylog --> jaxvacua
   jaxpolylog --> kahlerjax
   kahlerjax --> jaxiverse
-  subgraph stringjax["stringjax (umbrella)"]
+  subgraph stringforge["stringforge (umbrella)"]
     jaxvacua
     kahlerjax
     jaxiverse
@@ -57,7 +57,7 @@ see [the architecture page](architecture).
 
 ## Citing the framework
 
-If you use any part of the StringJAX ecosystem in your research, cite the
+If you use any part of the StringForge ecosystem in your research, cite the
 framework paper:
 
 ```bibtex

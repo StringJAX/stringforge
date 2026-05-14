@@ -2,7 +2,7 @@
 
 ## Overview
 
-stringjax provides access to large databases of Calabi-Yau threefold geometries through a unified interface. The data is hosted on [HuggingFace](https://huggingface.co/datasets/aschachner/cy-database) and downloaded on demand — only the files you actually need are fetched and cached locally.
+stringforge provides access to large databases of Calabi-Yau threefold geometries through a unified interface. The data is hosted on [HuggingFace](https://huggingface.co/datasets/aschachner/cy-database) and downloaded on demand — only the files you actually need are fetched and cached locally.
 
 Two databases are currently available:
 
@@ -18,7 +18,7 @@ Each model in the database carries:
 
 ## Two ways to load models
 
-The stringjax ecosystem supports two complementary ways to load Calabi-Yau geometry:
+The stringforge ecosystem supports two complementary ways to load Calabi-Yau geometry:
 
 ### Local models (`model_ID`)
 
@@ -33,11 +33,11 @@ This requires no internet connection and no external dependencies beyond the loc
 
 ### HuggingFace database
 
-For large-scale studies involving thousands or millions of geometries, the database API in `stringjax` provides access to the full Kreuzer-Skarke and CICY lists:
+For large-scale studies involving thousands or millions of geometries, the database API in `stringforge` provides access to the full Kreuzer-Skarke and CICY lists:
 
 ```python
-from stringjax.cy_io import TDFDatabase
-from stringjax.lcs_database import LCSDatabase
+from stringforge.cy_io import TDFDatabase
+from stringforge.lcs_database import LCSDatabase
 
 # Pure I/O — returns geometric data
 db = TDFDatabase()
@@ -86,7 +86,7 @@ The database uses a **lazy download** strategy:
 3. **Loading** (`db.load(...)`) — downloads only the specific shard(s) containing the requested model.
 4. **Batch loading** (`db.load_batch(h11=2)`) — downloads shards as needed.
 
-Downloaded files are cached in `.stringjax_cache/` (in the current working directory) by default. This keeps data visible and project-local. The location can be changed globally via `stringjax.set_data_dir()` or the `STRINGJAX_DATA_DIR` environment variable, or per-instance via the `cache_dir` constructor argument.
+Downloaded files are cached in `.stringforge_cache/` (in the current working directory) by default. This keeps data visible and project-local. The location can be changed globally via `stringforge.set_data_dir()` or the `STRINGFORGE_DATA_DIR` environment variable, or per-instance via the `cache_dir` constructor argument.
 
 Subsequent loads of models in the same shard are served from disk (or from an in-memory LRU cache for recently accessed shards). A one-time warning is issued if the data directory exceeds 500 MB.
 
@@ -130,17 +130,17 @@ db.clear_cache(include_vacua=True)  # also delete stored vacuum solutions
 For HPC clusters without internet access:
 
 1. Warm the cache on a machine with internet: load the models you need.
-2. Copy the local cache directory (default: `.stringjax_cache/`) to the cluster.
+2. Copy the local cache directory (default: `.stringforge_cache/`) to the cluster.
 3. Use `TDFDatabase(offline=True)` — all data served from cache.
 
 ## Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `STRINGJAX_DATA_DIR` | `{cwd}/.stringjax_cache` | Override the data directory for all database operations |
-| `STRINGJAX_HF_REPO` | `aschachner/cy-database` | Override the HuggingFace repository ID |
-| `STRINGJAX_VAULT` | (auto-detect) | Override the vacua-vault directory (see vault docs) |
-| `STRINGJAX_VAULT_REPO` | `aschachner/vacua_vault` | Override the HuggingFace vault repository ID |
+| `STRINGFORGE_DATA_DIR` | `{cwd}/.stringforge_cache` | Override the data directory for all database operations |
+| `STRINGFORGE_HF_REPO` | `aschachner/cy-database` | Override the HuggingFace repository ID |
+| `STRINGFORGE_VAULT` | (auto-detect) | Override the vacua-vault directory (see vault docs) |
+| `STRINGFORGE_VAULT_REPO` | `aschachner/vacua_vault` | Override the HuggingFace vault repository ID |
 
 ## Further reading
 
@@ -149,8 +149,8 @@ For HPC clusters without internet access:
 - {doc}`Tutorial notebook: Database interface <../tutorials/database_and_infrastructure/database_interface>`
 - {doc}`Tutorial notebook: Vacua storage <../tutorials/database_and_infrastructure/vacua_storage>`
 - {doc}`Tutorial notebook: Cluster parallelisation <../tutorials/database_and_infrastructure/cluster_parallelisation>`
-- {doc}`API reference: stringjax.cy_io <../api/stringjax.cy_io>`
-- {doc}`API reference: stringjax.lcs_database <../api/stringjax.lcs_database>`
+- {doc}`API reference: stringforge.cy_io <../api/stringforge.cy_io>`
+- {doc}`API reference: stringforge.lcs_database <../api/stringforge.lcs_database>`
 - {doc}`Migration from jaxvacua <../ecosystem/migration_from_jaxvacua>` — module rename and the 2026-05-01 mirror-convention swap.
 
 ### Physics background

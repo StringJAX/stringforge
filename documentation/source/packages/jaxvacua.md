@@ -2,7 +2,7 @@
 
 **Type IIB flux vacua: complex-structure and axio-dilaton sector, vacuum finding, stability analysis.**
 
-JAXVacua is the core flux-vacuum engine of the StringJAX ecosystem. It implements
+JAXVacua is the core flux-vacuum engine of the StringForge ecosystem. It implements
 the layered pipeline from topological data to flux-vacuum solutions, built
 natively on JAX with automatic differentiation, just-in-time compilation, and
 hardware acceleration throughout.
@@ -35,8 +35,8 @@ The full module-by-module breakdown lives in [the architecture page](../ecosyste
 
 - [`cytools`](cytools) — `Polytope`, `Triangulation`, `Cone` for KS-polytope input.
 - [`jaxpolylog`](jaxpolylog) — `jax_polylog_vmap` for the instanton sum.
-- [`stringjax`](../api/index) — for catalog / vacua-vault tooling, end users typically
-  go through `stringjax.lcs_database.LCSDatabase` rather than constructing
+- [`stringforge`](../api/index) — for catalog / vacua-vault tooling, end users typically
+  go through `stringforge.lcs_database.LCSDatabase` rather than constructing
   models by hand.
 
 ## Links

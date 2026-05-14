@@ -1,9 +1,9 @@
-stringjax.vacua_writer
+stringforge.vacua_writer
 ========================
 
-.. currentmodule:: stringjax.vacua_writer
+.. currentmodule:: stringforge.vacua_writer
 
-.. automodule:: stringjax.vacua_writer
+.. automodule:: stringforge.vacua_writer
 
 
 VacuaWriter
@@ -11,12 +11,12 @@ VacuaWriter
 
 Standalone class for writing, querying, retracting, and pushing flux-vacuum
 solutions to the vault and to the community HuggingFace repository.  Wraps a
-:class:`stringjax.cy_io.CYDatabase` (or any subclass) instance and forwards
+:class:`stringforge.cy_io.CYDatabase` (or any subclass) instance and forwards
 attribute lookups to it via ``__getattr__``.
 
 Users can either call the methods directly on an explicit ``VacuaWriter(db)``
 instance, or use the thin delegation methods exposed on
-:class:`stringjax.lcs_database.LCSDatabase` — both paths call the same code.
+:class:`stringforge.lcs_database.LCSDatabase` — both paths call the same code.
 
 .. autosummary::
     :toctree: _autosummary

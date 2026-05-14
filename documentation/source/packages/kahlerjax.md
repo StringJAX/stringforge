@@ -3,7 +3,7 @@
 ```{admonition} Planned
 :class: note
 KahlerJAX is under development and will be released publicly in a future
-version of StringJAX. This page is a placeholder for the package's public
+version of StringForge. This page is a placeholder for the package's public
 overview. The architecture page describes the planned module surface; the
 links section will be populated when the docs go live.
 ```

@@ -1,9 +1,9 @@
-StringJAX
+StringForge
 =========
 
 **Differentiable tools for string compactifications with JAX.**
 
-StringJAX is a Python framework for the systematic construction and
+StringForge is a Python framework for the systematic construction and
 analysis of string vacua. It provides a unified computational pipeline
 from Calabi–Yau compactification data to four-dimensional effective
 field theories, vacuum solutions, and physical observables — with

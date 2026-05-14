@@ -1,5 +1,5 @@
 r"""
-stringjax.vacuavault — tooling for the HuggingFace ``vacua_vault``
+stringforge.vacuavault — tooling for the HuggingFace ``vacua_vault``
 dataset repository.
 
 This subpackage provides three CLI-driven operations for maintaining the
@@ -20,7 +20,7 @@ All three are dispatched by :mod:`.__main__` via argparse subcommands.
 
 Module layout::
 
-    stringjax/vacuavault/
+    stringforge/vacuavault/
     ├── __init__.py     — this file (re-exports public entry points)
     ├── __main__.py     — CLI dispatcher
     ├── ci.py           — validate_pr_diff()

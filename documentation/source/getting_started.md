@@ -8,19 +8,19 @@ first.
 
 ```bash
 # Create and activate a virtual environment (recommended)
-python -m venv stringjax-env && source stringjax-env/bin/activate
+python -m venv stringforge-env && source stringforge-env/bin/activate
 
 # Install from GitHub
-pip install -e "git+https://github.com/AndreasSchachner/stringjax.git#egg=stringjax"
+pip install -e "git+https://github.com/AndreasSchachner/stringforge.git#egg=stringforge"
 
 # Or clone and install locally (recommended for development)
-git clone --recurse-submodules https://github.com/AndreasSchachner/stringjax.git
-cd stringjax
+git clone --recurse-submodules https://github.com/AndreasSchachner/stringforge.git
+cd stringforge
 pip install -e .
 ```
 
 ```{caution}
-StringJAX requires `float64` precision. [JAX Metal](https://developer.apple.com/metal/jax/)
+StringForge requires `float64` precision. [JAX Metal](https://developer.apple.com/metal/jax/)
 on macOS does not support `float64` and is therefore incompatible. Use the CPU backend
 on Mac.
 ```

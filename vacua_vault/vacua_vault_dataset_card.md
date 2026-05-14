@@ -434,7 +434,7 @@ Every contribution goes through **two layers** of validation:
 Failures raise `ValidationError` locally — nothing is uploaded.
 
 **Layer 2 — Server-side, on the PR branch.**
-A CI workflow runs `python -m stringjax.vacuavault validate` on every PR. It
+A CI workflow runs `python -m stringforge.vacuavault validate` on every PR. It
 repeats all Layer 1 checks (no trust in client-side validation),
 reconstructs the model from identity fields, verifies F-terms to a tight
 tolerance, and cross-checks against the existing catalogue. Output:
@@ -486,7 +486,7 @@ On every push to `main` (i.e. after a PR merge), a separate CI workflow
 triggers and runs:
 
 ```
-python -m stringjax.vacuavault rebuild_catalog
+python -m stringforge.vacuavault rebuild_catalog
 ```
 
 This scans all `**/*.parquet` files, extracts per-file metadata (path,
@@ -502,7 +502,7 @@ locally:
 ```bash
 git clone https://huggingface.co/datasets/aschachner/vacua_vault
 cd vacua_vault
-python -m stringjax.vacuavault rebuild_catalog --repo-path .
+python -m stringforge.vacuavault rebuild_catalog --repo-path .
 git commit -am "rebuild catalog" && git push
 ```
 

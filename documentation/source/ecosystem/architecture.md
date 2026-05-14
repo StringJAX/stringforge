@@ -7,17 +7,17 @@ page is the technical companion.
 
 ## Owner / consumer matrix
 
-### `stringjax` — shared infrastructure
+### `stringforge` — shared infrastructure
 
 This package owns the cross-cutting infrastructure consumed by sibling packages
 and end-user pipelines.
 
 | Module | Public symbols | Purpose |
 | --- | --- | --- |
-| [`stringjax.cy_io`](../api/stringjax.cy_io) | `CYDatabase`, `TDFDatabase`, `CICYDatabase`, `query_models`, `load_catalog` | Catalog I/O, query layer over the `aschachner/cy-database` HuggingFace dataset. |
-| [`stringjax.lcs_database`](../api/stringjax.lcs_database) | `LCSDatabase`, `load_tdf_model`, `load_cicy_model` | Mirror-convention model construction. Extends `CYDatabase` with `lcs_tree` / `FluxVacuaFinder` builders, batch / iter / sample APIs. |
-| [`stringjax.vacua_writer`](../api/stringjax.vacua_writer) | `VacuaWriter` and database delegations | Vacuum-solution persistence, designation / retraction / purge, HuggingFace `vacua_vault` push and fetch. |
-| [`stringjax.vacuavault`](../api/stringjax.vacuavault) | `SCHEMA_VERSION`, `validate_parquet_file`, `validate_pr_diff`, `rebuild_catalog`, `curate_submission` | Schema validation and catalog rebuild for the public vacua vault. Pure dependency-injection — does not import jaxvacua. |
+| [`stringforge.cy_io`](../api/stringforge.cy_io) | `CYDatabase`, `TDFDatabase`, `CICYDatabase`, `query_models`, `load_catalog` | Catalog I/O, query layer over the `aschachner/cy-database` HuggingFace dataset. |
+| [`stringforge.lcs_database`](../api/stringforge.lcs_database) | `LCSDatabase`, `load_tdf_model`, `load_cicy_model` | Mirror-convention model construction. Extends `CYDatabase` with `lcs_tree` / `FluxVacuaFinder` builders, batch / iter / sample APIs. |
+| [`stringforge.vacua_writer`](../api/stringforge.vacua_writer) | `VacuaWriter` and database delegations | Vacuum-solution persistence, designation / retraction / purge, HuggingFace `vacua_vault` push and fetch. |
+| [`stringforge.vacuavault`](../api/stringforge.vacuavault) | `SCHEMA_VERSION`, `validate_parquet_file`, `validate_pr_diff`, `rebuild_catalog`, `curate_submission` | Schema validation and catalog rebuild for the public vacua vault. Pure dependency-injection — does not import jaxvacua. |
 
 ### `jaxvacua` — the flux-vacua engine
 
@@ -73,31 +73,31 @@ the EFT manually.
 ## Cross-package dependency injection: the `lcs_tree` bus
 
 A subtle but important design point: `lcs_tree` is *defined* in `jaxvacua`, but
-`stringjax.vacua_writer` consumes it via duck typing — it accepts either a
+`stringforge.vacua_writer` consumes it via duck typing — it accepts either a
 `flux_sector`-like object (with `.periods.lcs_tree`) or an `lcs_tree` directly,
 and never imports the concrete class. The relevant excerpt from
-`stringjax/vacua_writer.py`:
+`stringforge/vacua_writer.py`:
 
 ```python
 tree = getattr(getattr(model, "periods", None), "lcs_tree", model)
 ```
 
-This pattern lets stringjax stay free of any jaxvacua import (`stringjax`'s
+This pattern lets stringforge stay free of any jaxvacua import (`stringforge`'s
 `__init__.py` only lazy-tries the siblings) while still operating on jaxvacua
 data. Sibling packages can plug into the vacua-vault layer the same way: pass
 any object that exposes the expected attributes.
 
 The trade-off is that the runtime contract is implicit. The
-[vacua-vault schema page](../api/stringjax.vacuavault) documents what fields
+[vacua-vault schema page](../api/stringforge.vacuavault) documents what fields
 are read.
 
 ## Convention boundaries
 
 Two conventions cross package boundaries and are easy to get wrong:
 
-- **Mirror vs. catalog convention for Hodge numbers.** `stringjax.cy_io.CYDatabase`
+- **Mirror vs. catalog convention for Hodge numbers.** `stringforge.cy_io.CYDatabase`
   speaks *catalog* convention (the parquet column names match the original
-  geometry's $h^{1,1}$ and $h^{1,2}$). `stringjax.lcs_database.LCSDatabase`
+  geometry's $h^{1,1}$ and $h^{1,2}$). `stringforge.lcs_database.LCSDatabase`
   speaks *mirror* convention end-to-end on its public surface — this matches
   `lcs_tree.h11` / `lcs_tree.h12` (mirror) and the jaxvacua physics. Translation
   happens at every public method's entry / exit. See

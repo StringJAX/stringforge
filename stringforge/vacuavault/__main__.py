@@ -1,11 +1,11 @@
 r"""
-CLI dispatcher for the ``stringjax.vacuavault`` tooling.
+CLI dispatcher for the ``stringforge.vacuavault`` tooling.
 
 Usage:
 
-    python -m stringjax.vacuavault validate [--base-branch main] [--repo-path .]
-    python -m stringjax.vacuavault rebuild_catalog [--repo-path .] [--output catalog.parquet]
-    python -m stringjax.vacuavault curate <community_file> [--repo-root .] [--new-label LABEL] [--dry-run]
+    python -m stringforge.vacuavault validate [--base-branch main] [--repo-path .]
+    python -m stringforge.vacuavault rebuild_catalog [--repo-path .] [--output catalog.parquet]
+    python -m stringforge.vacuavault curate <community_file> [--repo-root .] [--new-label LABEL] [--dry-run]
 """
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def _cmd_curate(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python -m stringjax.vacuavault",
+        prog="python -m stringforge.vacuavault",
         description="Tooling for the HuggingFace vacua_vault dataset repo.",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
