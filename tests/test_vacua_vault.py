@@ -1,7 +1,11 @@
 # Copyright 2024 Andreas Schachner
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# This file is part of StringForge.
+#
+# StringForge is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 r"""
 Tests for the ``stringforge.vacuavault`` subpackage:
 

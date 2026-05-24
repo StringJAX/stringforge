@@ -2,39 +2,35 @@
 
 **Differentiable tools for string compactifications with JAX.**
 
-StringForge is a Python framework for the systematic construction and analysis of string vacua, built natively on [JAX](https://github.com/google/jax). It provides a unified computational pipeline from Calabi–Yau compactification data to four-dimensional effective field theories, vacuum solutions, and physical observables — with automatic differentiation, just-in-time compilation, and hardware acceleration throughout.
+StringForge is the shared data and infrastructure layer for the StringForge ecosystem of JAX-based string-compactification packages. It provides reproducible access to Calabi-Yau geometry databases, model-loading bridges into physics packages such as [JAXVacua](https://github.com/AndreasSchachner/jaxvacua), and a permanent vacua vault for storing, validating, curating, and publishing vacuum solutions.
 
-The framework is designed to turn the study of string compactifications from a largely case-by-case enterprise into a scalable, reproducible computational discipline. It combines curated databases of geometric and topological input data with efficient numerical tools for repeated sampling, optimisation, and stability analysis, enabling ensemble-level investigations of the string landscape.
+The goal is to make large-scale string-landscape computations less fragile: geometry data should be queried through a stable interface, expensive downloads should be cached lazily, generated vacua should carry enough provenance to be reused, and downstream packages should share the same database conventions.
 
 ## Key features
 
-- **Calabi–Yau geometry.** Period vectors, prepotentials, Kähler potentials, gauge kinetic matrices, and instanton corrections — evaluated from Kreuzer–Skarke polytopes (via [CYTools](https://cy.tools)) or CICY data.
-- **Moduli-space geometry.** Kähler metrics, Christoffel symbols, and curvature tensors computed via automatic differentiation of the Kähler potential — no analytic formulae required beyond the prepotential.
-- **Flux effective field theory.** GVW superpotential, covariant derivatives, F-term scalar potential, D3-tadpole, and SL(2,ℤ) duality — with clean separation of geometric and discrete flux data.
-- **Vacuum finding.** Gradient-based minimisation and Newton-type solvers for the F-term equations, with exact Jacobians from autodiff. ISD-biased flux sampling for efficient targeting of supersymmetric vacua.
-- **Stability analysis.** Exact Hessians and physical mass spectra via `jax.hessian`, without finite-difference noise.
-- **Ensemble generation.** Monte Carlo sampling of flux space and the Kähler cone interior, systematic flux enumeration subject to physical bounds, and one-line wrappers for generating large vacuum datasets.
-- **Reduced EFTs.** Abstract framework for integrating out heavy moduli (e.g. conifold freezing), with automatic reconstruction of the reduced superpotential and mass matrices.
-- **Database interfaces.** Kreuzer–Skarke (via CYTools), CICY, and one-modulus hypergeometric families. Custom geometries supported via user-supplied prepotentials or period functions.
-- **JAX-native throughout.** All core objects are JAX-registered pytrees: `jit`-compilable, `vmap`-batchable, and differentiable at arbitrary order.
+- **Geometry databases.** Unified access to the hosted TDF/Kreuzer-Skarke and CICY datasets through `CYDatabase`, `TDFDatabase`, `CICYDatabase`, and `LCSDatabase`.
+- **Lazy local caching.** Catalogues and parquet shards are downloaded on demand and cached under a configurable data directory, with an explicit offline mode for cluster jobs.
+- **JAXVacua bridge.** `LCSDatabase` loads database rows as `jaxvacua.lcs.lcs_tree` objects or fully initialised `FluxVacuaFinder` models when JAXVacua is installed.
+- **KKLT-vacua subset.** `KKLTDatabase` exposes the curated conifold-class indexed subset used for KKLT-style searches, including run-log provenance for cluster campaigns.
+- **Vacua vault.** `VacuaWriter` designates, validates, queries, uploads, fetches, retracts, and purges vacuum-solution parquet files in a shared vault layout.
+- **Vault validation tools.** `stringforge.vacuavault` validates parquet submissions, rebuilds catalogues, and supports curation workflows without importing physics solvers.
+- **Ecosystem documentation.** The documentation explains how StringForge relates to JAXVacua, JAXPolyLog, KahlerJAX, JAXiverse, CYTools, and the shared data conventions.
 
 ## Architecture
 
-The software architecture mirrors the layered structure of the physics:
+The package architecture mirrors the boundary between shared infrastructure and physics engines:
 
 ```
-periods          ← topological data, prepotential, period vector, Kähler potential
+CYDatabase      ← pure I/O, HuggingFace downloads, cache, catalog queries
     ↓
-css              ← Kähler geometry of the complex structure sector (autodiff)
+LCSDatabase     ← mirror-convention model loading for JAXVacua workflows
     ↓
-FluxEFT          ← flux background, superpotential, scalar potential
+KKLTDatabase    ← curated KKLT-vacua subset and cluster run tracking
     ↓
-FluxVacuaFinder  ← vacuum search, F-term solver, Hessian, mass spectrum
+VacuaWriter     ← designated vacua, vault catalogues, push/fetch workflows
 ```
 
-Each layer inherits from the one above and adds a new category of physics. Orthogonal standalone modules provide composable functionality: flux-vector algebra (`flux_utils`), heavy-field decoupling (`freezer`), Monte Carlo sampling (`sampling`), flux enumeration (`flux_bounding`), and database interfaces (`cytools_interface`, `cicy_prepot`).
-
-At the base sits the `lcs_tree` — a JAX-registered pytree that separates static model metadata (Hodge numbers, model identifiers) from array-valued numerical leaves (intersection numbers, instanton invariants, cone generators). This is the point at which topological input data become portable differentiable objects.
+The low-level database layer is intentionally solver-free. Physics construction is deferred to sibling packages at the point where a user asks for a model object, so the same catalogues can support JAXVacua, KahlerJAX, JAXiverse, and pure data-analysis workflows.
 
 ## Packages
 
@@ -53,66 +49,53 @@ StringForge is an umbrella framework comprising the following packages:
 import jax
 jax.config.update("jax_enable_x64", True)
 
-import jax.numpy as jnp
-from jaxvacua import flux_sector
+from stringforge import LCSDatabase
 
-# Load a model: CP^{11169}[18] at LCS with instanton corrections
-model = flux_sector(h12=2, model_ID=1, model_type="KS", maximum_degree=2)
+# Query the hosted TDF catalogue. Catalogues are downloaded lazily and cached.
+db = LCSDatabase(dataset="tdf", cache_dir=".stringforge_cache")
+models = db.query(h11=272, h12=2, has_conifolds=True)
+print(models[["h11", "h12", "ks_id", "triang_id", "n_conifolds"]].head())
 
-# Choose a flux vector and a point in moduli space
-fluxes = jnp.array([7, 3, -24, 0, -16, 50, 0, 3, -4, 0, 0, 0])
-z = jnp.array([2.742j, 2.057j])        # complex structure moduli
-tau = 6.855j                             # axio-dilaton
-
-# Evaluate covariant derivatives D_i W (should vanish at a vacuum)
-DW = model.DW(z, jnp.conj(z), tau, jnp.conj(tau), fluxes)
-print("|DW| =", jnp.abs(DW))
-
-# Evaluate the scalar potential
-V = model.scalar_potential(z, jnp.conj(z), tau, jnp.conj(tau), fluxes)
-print("V =", V)
-
-# Generate an ensemble of 10,000 flux vacua
-model.generate_sample(N=10000)
-```
-
-### Using Kreuzer–Skarke data via CYTools
-
-```python
-from cytools import fetch_polytopes
-
-p = fetch_polytopes(h11=2, h12=272, limit=5, lattice="N", as_list=True)[0]
-cy = p.triangulate().get_cy()
-
-model = flux_sector(
-    h12=cy.h11(), Q=cy.h11() + cy.h12() + 2,
-    model_type="KS", maximum_degree=10,
-    use_cytools=True, mirror_cy=cy
+# Load one catalogue row as a JAXVacua FluxVacuaFinder model.
+# Hodge numbers are in the mirror convention used by JAXVacua.
+row = models.iloc[0]
+finder = db.load_model(
+    h11=int(row["h11"]),
+    h12=int(row["h12"]),
+    ks_id=int(row["ks_id"]),
+    triang_id=int(row["triang_id"]),
+    include_gv=False,
 )
 ```
 
-### Batched evaluation with `vmap`
+The returned `finder` is a JAXVacua `FluxVacuaFinder`. Vacuum search, flux sampling, period calculations, and stability analysis are documented in the [JAXVacua documentation](https://jaxvacua.readthedocs.io).
+
+### Vacua vault workflow
 
 ```python
-import numpy as np
+import pandas as pd
 
-N = 10_000
-# Sample moduli inside the Kähler cone
-generators = model.periods.generators_kahler_cone
-coefficients = np.random.uniform(1, 5, (N, generators.shape[0]))
-z0 = np.random.uniform(-0.5, 0.5, (N, generators.shape[1])) \
-     + 1j * (coefficients @ generators)
-tau0 = np.random.uniform(-0.5, 0.5, (N,)) \
-       + 1j * np.random.uniform(2, 10, (N,))
+vacua = pd.DataFrame({
+    "flux": [[1, 0, -2, 3, 0, 1]],
+    "moduli_re": [[0.0, 0.0]],
+    "moduli_im": [[2.5, 3.0]],
+    "tau_re": [0.0],
+    "tau_im": [4.0],
+    "is_susy": [True],
+})
 
-# Vectorised ISD sampling
-ISD_sampling = jax.vmap(
-    lambda z, tau, flux: model.ISD_sampling(
-        z, jnp.conj(z), tau, jnp.conj(tau),
-        flux, mode="ISD+"
-    )
+db.designate_vacua(
+    vacua,
+    label="example_run",
+    committed_by="A. Schachner",
+    h11=int(row["h11"]),
+    h12=int(row["h12"]),
+    ks_id=int(row["ks_id"]),
+    triang_id=int(row["triang_id"]),
 )
-fluxes_isd = ISD_sampling(z0, tau0, np.random.randint(-3, 4, (N, model.n_fluxes)))
+
+designated = db.query_vacua(label="example_run")
+print(designated[["label", "n_vacua", "created"]])
 ```
 
 ## Installation
@@ -140,7 +123,7 @@ pip install -e .
 
 ## Documentation
 
-The StringForge ecosystem documentation — including package overviews, tutorials, and an ecosystem-pipeline walkthrough — can be built from the `documentation/` folder in this repository. The full JAXVacua API reference is available at [jaxvacua.readthedocs.io](https://jaxvacua.readthedocs.io).
+The StringForge ecosystem documentation — including package overviews, tutorials, database guides, and API reference pages — can be built from the `documentation/` folder in this repository. The full JAXVacua API reference is available at [jaxvacua.readthedocs.io](https://jaxvacua.readthedocs.io).
 
 To build the documentation locally:
 
@@ -155,16 +138,16 @@ make html
 
 Core dependencies (installed automatically via `pip`):
 
-- [JAX](https://github.com/google/jax) and jaxlib
-- NumPy, SciPy, SymPy
-- [Optax](https://github.com/deepmind/optax)
-- Matplotlib, Seaborn
-- h5py, Pandas, tqdm
+- NumPy
+- Pandas and PyArrow
+- [HuggingFace Hub](https://huggingface.co/docs/huggingface_hub)
+- [JAX](https://github.com/google/jax) and jaxlib for model-construction workflows
 
 Optional:
 
 - [CYTools](https://cy.tools) — for constructing models from Kreuzer–Skarke polytopes
-- [python-flint](https://github.com/flintlib/python-flint) — for exact arithmetic in selected routines
+- [JAXVacua](https://github.com/AndreasSchachner/jaxvacua) — for period calculations, flux EFTs, vacuum finding, and stability analysis
+- [python-flint](https://github.com/flintlib/python-flint) — for exact arithmetic in selected downstream routines
 
 ## Citation
 

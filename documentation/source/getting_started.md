@@ -36,59 +36,92 @@ required NumPy and JAX versions.
 import jax
 jax.config.update("jax_enable_x64", True)
 
-import jax.numpy as jnp
-from jaxvacua import flux_sector
+from stringforge import LCSDatabase
 
-# Load a model: CP^{11169}[18] at LCS with instanton corrections
-model = flux_sector(h12=2, model_ID=1, model_type="KS", maximum_degree=2)
+# Query the hosted TDF catalogue. Catalogues are downloaded lazily and cached.
+db = LCSDatabase(dataset="tdf", cache_dir=".stringforge_cache")
+models = db.query(h11=272, h12=2, has_conifolds=True)
+print(models[["h11", "h12", "ks_id", "triang_id", "n_conifolds"]].head())
 
-# Choose a flux vector and a point in moduli space
-fluxes = jnp.array([7, 3, -24, 0, -16, 50, 0, 3, -4, 0, 0, 0])
-z = jnp.array([2.742j, 2.057j])        # complex structure moduli
-tau = 6.855j                             # axio-dilaton
+# Load one catalogue row as a JAXVacua FluxVacuaFinder model.
+# Hodge numbers are in the mirror convention used by JAXVacua.
+row = models.iloc[0]
+finder = db.load_model(
+    h11=int(row["h11"]),
+    h12=int(row["h12"]),
+    ks_id=int(row["ks_id"]),
+    triang_id=int(row["triang_id"]),
+    include_gv=False,
+)
+```
 
-# Evaluate covariant derivatives D_i W (should vanish at a vacuum)
-DW = model.DW(z, jnp.conj(z), tau, jnp.conj(tau), fluxes)
-print("|DW| =", jnp.abs(DW))
+The returned `finder` is a JAXVacua `FluxVacuaFinder`. Use the
+[JAXVacua documentation](https://jaxvacua.readthedocs.io) for the vacuum-search,
+flux-sampling, period-calculation, and stability-analysis workflows built on
+top of this model object.
 
-# Evaluate the scalar potential
-V = model.scalar_potential(z, jnp.conj(z), tau, jnp.conj(tau), fluxes)
-print("V =", V)
+## Vacua vault
+
+```python
+import pandas as pd
+
+vacua = pd.DataFrame({
+    "flux": [[1, 0, -2, 3, 0, 1]],
+    "moduli_re": [[0.0, 0.0]],
+    "moduli_im": [[2.5, 3.0]],
+    "tau_re": [0.0],
+    "tau_im": [4.0],
+    "is_susy": [True],
+})
+
+db.designate_vacua(
+    vacua,
+    label="example_run",
+    committed_by="A. Schachner",
+    h11=int(row["h11"]),
+    h12=int(row["h12"]),
+    ks_id=int(row["ks_id"]),
+    triang_id=int(row["triang_id"]),
+)
+
+designated = db.query_vacua(label="example_run")
+print(designated[["label", "n_vacua", "created"]])
 ```
 
 ## Architecture
 
-The software architecture mirrors the layered structure of the physics:
+The package architecture mirrors the boundary between shared infrastructure and
+physics engines:
 
 ```
-periods          ← topological data, prepotential, period vector, Kähler potential
+CYDatabase      ← pure I/O, HuggingFace downloads, cache, catalog queries
     ↓
-css              ← Kähler geometry of the complex structure sector (autodiff)
+LCSDatabase     ← mirror-convention model loading for JAXVacua workflows
     ↓
-FluxEFT          ← flux background, superpotential, scalar potential
+KKLTDatabase    ← curated KKLT-vacua subset and cluster run tracking
     ↓
-FluxVacuaFinder  ← vacuum search, F-term solver, Hessian, mass spectrum
+VacuaWriter     ← designated vacua, vault catalogues, push/fetch workflows
 ```
 
-Each layer inherits from the one above and adds a new category of physics.
-Orthogonal standalone modules provide composable functionality: flux-vector
-algebra, heavy-field decoupling, Monte Carlo sampling, flux enumeration, and
-database interfaces.
+The low-level database layer is solver-free. Physics construction is deferred
+to sibling packages at the point where a user requests a model object, so the
+same catalogues can support JAXVacua, KahlerJAX, JAXiverse, and pure
+data-analysis workflows.
 
-See the individual [package pages](packages/jaxvacua) for details on each
-component.
+See the [package pages](packages/jaxvacua) and the [tutorial index](tutorials)
+for the available workflows.
 
 ## Requirements
 
 Core dependencies (installed automatically via `pip`):
 
-- [JAX](https://github.com/google/jax) and jaxlib
-- NumPy, SciPy, SymPy
-- [Optax](https://github.com/deepmind/optax)
-- Matplotlib, Seaborn
-- h5py, Pandas, tqdm
+- NumPy
+- Pandas and PyArrow
+- [HuggingFace Hub](https://huggingface.co/docs/huggingface_hub)
+- [JAX](https://github.com/google/jax) and jaxlib for model-construction workflows
 
 Optional:
 
 - [CYTools](https://cy.tools) — for constructing models from Kreuzer–Skarke polytopes
-- [python-flint](https://github.com/flintlib/python-flint) — for exact arithmetic in selected routines
+- [JAXVacua](https://github.com/AndreasSchachner/jaxvacua) — for period calculations, flux EFTs, vacuum finding, and stability analysis
+- [python-flint](https://github.com/flintlib/python-flint) — for exact arithmetic in selected downstream routines

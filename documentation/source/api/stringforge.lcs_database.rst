@@ -14,7 +14,7 @@ Extends :class:`stringforge.cy_io.CYDatabase` with model construction
 the canonical user-facing database class.
 
 .. autosummary::
-    :toctree: _autosummary
+    :toctree: ../_autosummary
     :template: custom-class-template.rst
 
     LCSDatabase
@@ -23,34 +23,25 @@ the canonical user-facing database class.
 Loading models
 -----------------------------------
 
-.. autosummary::
-    :toctree: _autosummary
-
-    LCSDatabase.load
-    LCSDatabase.load_from_conifold_row
-    LCSDatabase.load_model
-    LCSDatabase.load_batch
-    LCSDatabase.iter_batch
-    LCSDatabase.load_model_batch
-    LCSDatabase.iter_model_batch
-    LCSDatabase.sample
+* :meth:`LCSDatabase.load`
+* :meth:`LCSDatabase.load_from_conifold_row`
+* :meth:`LCSDatabase.load_model`
+* :meth:`LCSDatabase.load_batch`
+* :meth:`LCSDatabase.iter_batch`
+* :meth:`LCSDatabase.load_model_batch`
+* :meth:`LCSDatabase.iter_model_batch`
+* :meth:`LCSDatabase.sample`
 
 
 Cached model batches
 -----------------------------------
 
-.. autosummary::
-    :toctree: _autosummary
-
-    LCSDatabase.cached_models
-    LCSDatabase.clear_cached_models
+* :meth:`LCSDatabase.cached_models`
+* :meth:`LCSDatabase.clear_cached_models`
 
 
 Module-level convenience functions
 -----------------------------------
 
-.. autosummary::
-    :toctree: _autosummary
-
-    load_tdf_model
-    load_cicy_model
+* :func:`load_tdf_model`
+* :func:`load_cicy_model`

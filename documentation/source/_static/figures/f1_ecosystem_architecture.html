@@ -1,0 +1,71 @@
+<div class="sf-fig" id="sf-ecosystem-flow">
+  <div class="sf-chart">
+    <h3 class="sf-title">StringForge ecosystem flow</h3>
+    <p class="sf-caption">
+      StringForge supplies the shared data and vault infrastructure; the physics
+      packages keep their numerical engines and public APIs separate.
+    </p>
+
+    <div class="sf-section-label">External catalogues and numerical leaves</div>
+    <div class="sf-row sf-row-3">
+      <div class="sf-card sf-data">
+        <strong>CYTools</strong>
+        <span>Toric Calabi-Yau geometry and triangulation data.</span>
+      </div>
+      <div class="sf-card sf-data">
+        <strong>JAXPolyLog</strong>
+        <span>JAX-compatible polylogarithms used by the EFT packages.</span>
+      </div>
+      <div class="sf-card sf-data">
+        <strong>HuggingFace datasets</strong>
+        <span>CY catalogues, KKLT subsets, and curated vacua vaults.</span>
+      </div>
+    </div>
+
+    <div class="sf-arrow-row" style="--sf-cols: 3;">
+      <div class="sf-arrow"></div>
+      <div class="sf-arrow"></div>
+      <div class="sf-arrow"></div>
+    </div>
+
+    <div class="sf-section-label">Shared infrastructure layer</div>
+    <div class="sf-row sf-row-1">
+      <div class="sf-card sf-infra sf-wide sf-centred">
+        <strong>StringForge</strong>
+        <span>Catalogue I/O, mirror-convention model loaders, vacuum persistence, and vault validation.</span>
+      </div>
+    </div>
+
+    <div class="sf-arrow-row" style="--sf-cols: 4;">
+      <div class="sf-arrow"></div>
+      <div class="sf-arrow"></div>
+      <div class="sf-arrow"></div>
+      <div class="sf-arrow"></div>
+    </div>
+
+    <div class="sf-section-label">Physics packages and user workflows</div>
+    <div class="sf-row sf-row-4">
+      <div class="sf-card sf-engine">
+        <strong>JAXVacua</strong>
+        <span>Flux EFTs, vacuum finding, sampling, and stability analysis.</span>
+      </div>
+      <div class="sf-card sf-engine">
+        <strong>KahlerJAX</strong>
+        <span>Kahler-moduli stabilisation and corrected 4-D EFTs.</span>
+      </div>
+      <div class="sf-card sf-engine">
+        <strong>JAXiverse</strong>
+        <span>Axion spectra, couplings, and multi-axion effective theories.</span>
+      </div>
+      <div class="sf-card sf-engine">
+        <strong>Research pipelines</strong>
+        <span>End-to-end scans that combine database access and package-specific analysis.</span>
+      </div>
+    </div>
+
+    <div class="sf-footer">
+      Boundary rule: StringForge moves, validates, and names shared data; sibling
+      packages own the physics calculations performed on that data.
+    </div>
+  </div>
+</div>

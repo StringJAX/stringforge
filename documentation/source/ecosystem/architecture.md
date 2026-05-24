@@ -74,8 +74,8 @@ the EFT manually.
 
 A subtle but important design point: `lcs_tree` is *defined* in `jaxvacua`, but
 `stringforge.vacua_writer` consumes it via duck typing — it accepts either a
-`flux_sector`-like object (with `.periods.lcs_tree`) or an `lcs_tree` directly,
-and never imports the concrete class. The relevant excerpt from
+`FluxVacuaFinder`-like object (with `.periods.lcs_tree`) or an `lcs_tree`
+directly, and never imports the concrete class. The relevant excerpt from
 `stringforge/vacua_writer.py`:
 
 ```python
@@ -100,9 +100,7 @@ Two conventions cross package boundaries and are easy to get wrong:
   geometry's $h^{1,1}$ and $h^{1,2}$). `stringforge.lcs_database.LCSDatabase`
   speaks *mirror* convention end-to-end on its public surface — this matches
   `lcs_tree.h11` / `lcs_tree.h12` (mirror) and the jaxvacua physics. Translation
-  happens at every public method's entry / exit. See
-  [the migration page](migration_from_jaxvacua) for the rename and convention
-  notes.
+  happens at every public method's entry / exit.
 - **`x64` precision.** All sibling packages assume `JAX_ENABLE_X64=1`. Set this
   before importing JAX in your entry point.
 

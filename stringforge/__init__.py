@@ -29,9 +29,91 @@ Public submodules:
 Optional (private, install separately):
     kahlerjax  - Kahler moduli stabilisation
     jaxiverse  - Multi-axion EFT from string compactifications
+
+────────────────────────────────────────────────────────────────────────
+Common workflows — which class do I want?
+────────────────────────────────────────────────────────────────────────
+
+* **Query the on-disk catalog** (no model construction, no jaxvacua) —
+  :class:`stringforge.cy_io.CYDatabase` (or its dataset-specific
+  subclasses :class:`stringforge.cy_io.TDFDatabase` /
+  :class:`stringforge.cy_io.CICYDatabase`)::
+
+      from stringforge import TDFDatabase
+      db   = TDFDatabase()                  # downloads catalog on first use
+      cats = db.query(h11=3, has_conifolds=True)
+
+  All catalog columns and queries on this layer use the **catalog
+  convention** (small ``h11``, large ``h12``).
+
+* **Load a TDF / CICY model as a jaxvacua object** —
+  :class:`stringforge.lcs_database.LCSDatabase`::
+
+      from stringforge import LCSDatabase
+      db    = LCSDatabase(dataset="tdf")
+      model = db.load_model(ks_id=12345, triang_id=0, include_gv=True)
+
+  The ``LCSDatabase`` layer presents h11 / h12 in **mirror convention**
+  (jaxvacua / lcs_tree convention) — see the docstring on
+  :meth:`LCSDatabase.load` for the boundary-swap detail.
+
+* **Work with the curated KKLT-vacua subset** (conifold-class indexed,
+  cluster-run tracking, separate GV split) —
+  :class:`stringforge.kklt_database.KKLTDatabase`::
+
+      from stringforge import KKLTDatabase
+      db    = KKLTDatabase.from_local(".", tdf_cache_dir="./cy-database/")
+      model = db.load_model(h11=11, ks_id=384564,
+                            coni_class_id=0, coni_id=75,
+                            include_gv=True, gv_source="kklt")
+
+  KKLT methods use **mirror convention** for h11/h12 (large ``h11``,
+  small ``h12``) — the same convention as :class:`LCSDatabase`.  The
+  on-disk KKLT catalogs use the *catalog* convention; the swap happens
+  at the API boundary.  ``ks_id`` is only unique within a fixed
+  ``(h11, h12)``, so ``h11`` is required; pass ``h12=`` too only when
+  the resolver tells you the lookup is ambiguous.
+
+* **Save vacuum solutions to a permanent vault** (designated solutions,
+  HF Hub push/fetch) —
+  :class:`stringforge.vacua_writer.VacuaWriter`::
+
+      from stringforge import LCSDatabase
+      db = LCSDatabase(dataset="tdf")
+      with db.vacua_writer(model=model) as writer:
+          for result in newton_search_results:
+              writer.append(result, tags=["benchmark"])
+      # Query the run-tagged rows back, then designate them.
+      df = db.query_vacua(run_id=writer.run_id)
+      db.designate_vacua(df, label="my_run", committed_by="A. Schachner")
+      db.push_vacua_to_hub()                # publish to HF Hub
+
+* **Validate vault parquet files / rebuild the catalog** —
+  :mod:`stringforge.vacuavault`
+  (``python -m stringforge.vacuavault validate ...``).
+
+* **Inspect raw KKLT parquet rows without jaxvacua** —
+  :meth:`KKLTDatabase.load_dataframes` returns ``pandas.Series`` /
+  ``pandas.DataFrame`` objects for tabular workflows.
+
+────────────────────────────────────────────────────────────────────────
+Caching, offline mode, and the data dir
+────────────────────────────────────────────────────────────────────────
+
+Catalogs and parquet shards are downloaded **lazily on first use** and
+cached under ``stringforge.data_dir`` (default ``./.stringforge_cache``;
+override with the ``STRINGFORGE_DATA_DIR`` env var or
+:func:`set_data_dir`).  Vacuum solutions live in a separate
+``vacua_vault/`` directory (override with ``STRINGFORGE_VAULT`` /
+:func:`set_vault_dir`) so :meth:`CYDatabase.clear_cache` never wipes
+them.
+
+Pass ``offline=True`` to any database constructor (or use
+:meth:`CYDatabase.from_local`) to disable network access — every
+``_fetch_shard`` call then raises if its file isn't already cached.
 """
 
-__version__ = '0.0.2'
+__version__ = "0.1.0"
 
 # ── Data directory ────────────────────────────────────────────────────────
 # Default location for all database cache and vacua storage.  Override
@@ -125,24 +207,6 @@ from .kklt_database import *
 from .vacua_writer import *
 from .vacuavault import *
 
-# Re-export public submodules.
-try:
-    import jaxpolylog
-except ImportError:
-    pass
-
-try:
-    import jaxvacua
-except ImportError:
-    pass
-
-# Optional private submodules — available only with `pip install .[full]`.
-try:
-    import kahlerjax
-except ImportError:
-    pass
-
-try:
-    import jaxiverse
-except ImportError:
-    pass
+# Optional ecosystem packages are intentionally not imported here.  Keeping the
+# package import lightweight avoids solver-library side effects and lets users
+# import ``stringforge`` for pure database/vault workflows.

@@ -1,0 +1,69 @@
+<div class="sf-fig" id="sf-vault-flow">
+  <div class="sf-chart">
+    <h3 class="sf-title">Vacua vault workflow</h3>
+    <p class="sf-caption">
+      Local search results are first written as session data, then designated,
+      validated, and optionally published to the shared HuggingFace vault.
+    </p>
+
+    <div class="sf-section-label">Local vacuum search</div>
+    <div class="sf-row sf-row-3">
+      <div class="sf-card sf-engine">
+        <strong>FluxVacuaFinder</strong>
+        <span>Produces flux vectors, moduli values, masses, and diagnostics.</span>
+      </div>
+      <div class="sf-card sf-engine">
+        <strong>Search metadata</strong>
+        <span>Records model identity, tadpole bound, solver settings, and labels.</span>
+      </div>
+      <div class="sf-card sf-engine">
+        <strong>DataFrame / parquet</strong>
+        <span>Normalised tabular representation of the accepted solutions.</span>
+      </div>
+    </div>
+
+    <div class="sf-arrow-row" style="--sf-cols: 3;">
+      <div class="sf-arrow"></div>
+      <div class="sf-arrow"></div>
+      <div class="sf-arrow"></div>
+    </div>
+
+    <div class="sf-section-label">Session tier</div>
+    <div class="sf-row sf-row-1">
+      <div class="sf-card sf-infra sf-wide sf-centred">
+        <strong>VacuaWriter.vacua_writer</strong>
+        <span>Writes local run files, supports query/load/delete helpers, and keeps raw search output reproducible.</span>
+      </div>
+    </div>
+
+    <div class="sf-arrow-row" style="--sf-cols: 2;">
+      <div class="sf-arrow"></div>
+      <div class="sf-arrow"></div>
+    </div>
+
+    <div class="sf-section-label">Designation and review</div>
+    <div class="sf-row sf-row-2">
+      <div class="sf-card sf-vault">
+        <strong>Designation layer</strong>
+        <span><code>designate_vacua</code>, <code>query_designated</code>, retraction, and purge operations.</span>
+      </div>
+      <div class="sf-card sf-vault">
+        <strong>vacuavault validation</strong>
+        <span>Schema checks, identity checks, optional physics checks, and catalogue rebuilds.</span>
+      </div>
+    </div>
+
+    <div class="sf-arrow-row" style="--sf-cols: 2;">
+      <div class="sf-arrow"></div>
+      <div class="sf-arrow"></div>
+    </div>
+
+    <div class="sf-section-label">Shared publication target</div>
+    <div class="sf-row sf-row-1">
+      <div class="sf-card sf-data sf-wide sf-centred">
+        <strong>aschachner/vacua_vault</strong>
+        <span>Curated HuggingFace dataset with validated parquet files, rebuilt catalogues, and downstream fetch helpers.</span>
+      </div>
+    </div>
+  </div>
+</div>

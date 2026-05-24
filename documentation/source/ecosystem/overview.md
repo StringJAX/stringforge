@@ -17,27 +17,15 @@ documentation.
 | [`jaxiverse`](../packages/jaxiverse) | Multi-axion EFT: spectra, decay constants, couplings from CY compactifications. | Planned (public release pending) | — |
 | [`cytools`](../packages/cytools) | Toric Calabi–Yau geometry library (external dependency). | Public | [arXiv:2211.03823](https://arxiv.org/abs/2211.03823) |
 
-## Dependency diagram
+## Ecosystem flow
 
-The graph below shows code-level dependencies (solid edges) and the umbrella
-aggregation (the `stringforge` cluster). `cytools` and `jaxpolylog` are leaves;
-`kahlerjax` is consumed by `jaxiverse`; `jaxvacua` stands as its own pillar and
-is consumed only via `stringforge`'s shared infrastructure.
+The figure below shows the practical boundary between StringForge and the
+sibling packages. StringForge owns shared data movement and validation; the
+physics packages own their package-specific calculations.
 
-```{mermaid}
-graph TD
-  cytools --> jaxvacua
-  cytools --> kahlerjax
-  cytools --> jaxiverse
-  jaxpolylog --> jaxvacua
-  jaxpolylog --> kahlerjax
-  kahlerjax --> jaxiverse
-  subgraph stringforge["stringforge (umbrella)"]
-    jaxvacua
-    kahlerjax
-    jaxiverse
-    jaxpolylog
-  end
+```{eval-rst}
+.. raw:: html
+   :file: ../_static/figures/f1_ecosystem_architecture.html
 ```
 
 For a finer-grained breakdown of who owns what and who consumes what,
@@ -53,7 +41,7 @@ see [the architecture page](architecture).
 | Kähler moduli stabilisation. | The KahlerJAX docs (link will appear here once public). |
 | Axion physics. | The JAXiverse docs (link will appear here once public). |
 | End-to-end multi-package pipeline (CY → flux vacua → Kähler stabilisation → axion spectrum). | [Ecosystem pipeline](../tutorials/ecosystem_pipeline) on this site. |
-| The recent `LCSDatabase` rename and mirror-convention swap. | [Migration from jaxvacua](migration_from_jaxvacua). |
+| Package boundaries and database conventions. | [Architecture](architecture), including the `lcs_tree` data bus and the catalog / mirror convention boundary. |
 
 ## Citing the framework
 

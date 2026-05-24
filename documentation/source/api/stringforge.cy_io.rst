@@ -16,7 +16,7 @@ For model construction (``lcs_tree`` / ``FluxVacuaFinder``) and vacua
 persistence, see ``stringforge.lcs_database`` and ``stringforge.vacua_writer``.
 
 .. autosummary::
-    :toctree: _autosummary
+    :toctree: ../_autosummary
     :template: custom-class-template.rst
 
     CYDatabase
@@ -27,19 +27,13 @@ persistence, see ``stringforge.lcs_database`` and ``stringforge.vacua_writer``.
 Discovery
 -----------------------------------
 
-.. autosummary::
-    :toctree: _autosummary
-
-    CYDatabase.info
-    CYDatabase.query
-    CYDatabase.query_conifolds
+* :meth:`CYDatabase.info`
+* :meth:`CYDatabase.query`
+* :meth:`CYDatabase.query_conifolds`
 
 
 Module-level convenience functions
 -----------------------------------
 
-.. autosummary::
-    :toctree: _autosummary
-
-    load_catalog
-    query_models
+* :func:`load_catalog`
+* :func:`query_models`

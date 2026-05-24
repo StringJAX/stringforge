@@ -154,6 +154,25 @@ class LCSDatabase(CYDatabase):
     as a separate `ModelEnsemble` class composing LCSDatabase + VacuaWriter.
     """
 
+    def __new__(cls, *args: Any, **kwargs: Any) -> "LCSDatabase":
+        r"""Factory dispatch.
+
+        When the user constructs ``LCSDatabase(dataset="kklt_vacua")`` or
+        ``LCSDatabase("kklt_vacua")`` directly, return a
+        :class:`~stringforge.kklt_database.KKLTDatabase` instance instead.
+        Python then calls
+        :meth:`KKLTDatabase.__init__` on the returned object (because
+        ``isinstance(returned, LCSDatabase)``), so the dispatch is
+        transparent to callers.
+        """
+        dataset = kwargs.get("dataset")
+        if dataset is None and args:
+            dataset = args[0]
+        if cls is LCSDatabase and dataset == "kklt_vacua":
+            from .kklt_database import KKLTDatabase
+            return object.__new__(KKLTDatabase)
+        return super().__new__(cls)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Filter-keyed cache populated by load_model_batch
@@ -469,8 +488,9 @@ class LCSDatabase(CYDatabase):
         kwargs["chi"] = None
         
         # ---- Optionally fetch conifold data --------------------------------
-        # NOTE: `h11` was swapped with h12 above (line 1524-1525) for API
-        # conventions, so use the catalog's h11 for the shard path.
+        # Conifold shards are sharded by *catalog* h11 (the on-disk
+        # convention), so use the entry's original h11 before the mirror
+        # swap performed above.
         _cat_h11 = int(entry["h11"])
         conifold_list = []
         if include_conifolds and int(entry.get("n_conifolds", 0)) > 0:
@@ -550,6 +570,12 @@ class LCSDatabase(CYDatabase):
                 if cf_extra:
                     kwargs["extra_data"] = {**(kwargs.get("extra_data") or {}), **cf_extra}
 
+        # Pass ``maximum_degree`` through as an int; 0 means no
+        # instanton-degree cutoff.
+        kwargs["maximum_degree"] = (
+            int(maximum_degree) if maximum_degree is not None else 0
+        )
+
         return lcs_tree.from_dict(kwargs)
 
     def load_from_conifold_row(
@@ -610,16 +636,18 @@ class LCSDatabase(CYDatabase):
         include_gv: bool = False,
         include_conifolds: Union[bool, str] = False,
         maximum_degree: int = 0,
-        **flux_sector_kwargs: Any,
+        **model_kwargs: Any,
     ) -> Any:
         r"""
         **Description:**
         Load a model from the database and return it as a fully initialised
-        :class:`~jaxvacua.flux_eft.FluxEFT` object.
+        :class:`~jaxvacua.flux_vacua_finder.FluxVacuaFinder` object.
 
         This is a convenience wrapper around :meth:`load` followed by
-        construction of a :class:`~jaxvacua.flux_eft.FluxEFT` with
-        ``lcs_tree_input``.
+        construction of a
+        :class:`~jaxvacua.flux_vacua_finder.FluxVacuaFinder` with
+        ``lcs_tree_input``.  The returned object includes the period,
+        complex-structure-sector, flux-EFT, and vacuum-finding layers.
 
         Args:
             ks_id (int | None): Kreuzer-Skarke polytope index (tdf only).
@@ -633,14 +661,14 @@ class LCSDatabase(CYDatabase):
             include_conifolds (bool): Attach conifold data.  Defaults to
                 ``False``.
             maximum_degree (int): Maximum instanton degree; passed to
-                :class:`~jaxvacua.flux_eft.FluxEFT`.  Defaults to ``0``
-                (instanton corrections disabled).
-            **flux_sector_kwargs: Additional keyword arguments forwarded to
-                :class:`~jaxvacua.flux_eft.FluxEFT`, e.g. ``Q``,
-                ``limit``, ``gauge_choice``.
+                :class:`~jaxvacua.flux_vacua_finder.FluxVacuaFinder`.
+                Defaults to ``0`` (instanton corrections disabled).
+            **model_kwargs: Additional keyword arguments forwarded to
+                :class:`~jaxvacua.flux_vacua_finder.FluxVacuaFinder`,
+                e.g. ``Q``, ``limit``, ``gauge_choice``.
 
         Returns:
-            flux_sector: Initialised flux-sector model.
+            FluxVacuaFinder: Initialised JAXVacua model.
 
         Raises:
             KeyError: If the requested model is not in the catalog.
@@ -660,7 +688,7 @@ class LCSDatabase(CYDatabase):
         return FluxVacuaFinder(
             lcs_tree_input=tree,
             maximum_degree=maximum_degree,
-            **flux_sector_kwargs,
+            **model_kwargs,
         )
 
     def load_batch(

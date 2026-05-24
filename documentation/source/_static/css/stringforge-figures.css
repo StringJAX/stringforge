@@ -1,0 +1,230 @@
+.sf-fig {
+  --sf-ink: #253041;
+  --sf-muted: #5f6c7b;
+  --sf-line: #c9d4e1;
+  --sf-paper: #ffffff;
+  --sf-soft: #f5f8fb;
+  --sf-blue: #1f5f8f;
+  --sf-blue-soft: #e8f2f8;
+  --sf-green: #24705a;
+  --sf-green-soft: #e8f4ef;
+  --sf-amber: #8a5f18;
+  --sf-amber-soft: #fbf1dc;
+  --sf-purple: #5a5f91;
+  --sf-purple-soft: #eceef8;
+  color: var(--sf-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 1.7rem 0;
+}
+
+.sf-fig * {
+  box-sizing: border-box;
+}
+
+.sf-chart {
+  background: linear-gradient(180deg, #ffffff 0%, var(--sf-soft) 100%);
+  border: 1px solid var(--sf-line);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(37, 48, 65, 0.08);
+  margin: 0 auto;
+  max-width: 980px;
+  overflow: hidden;
+  padding: 22px;
+}
+
+.sf-title {
+  color: var(--sf-ink);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0;
+  text-align: center;
+}
+
+.sf-caption {
+  color: var(--sf-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin: 0.45rem auto 1.15rem;
+  max-width: 760px;
+  text-align: center;
+}
+
+.sf-section-label {
+  color: var(--sf-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin: 1rem 0 0.45rem;
+  text-transform: uppercase;
+}
+
+.sf-row {
+  display: grid;
+  gap: 14px;
+}
+
+.sf-row-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sf-row-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sf-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sf-row-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.sf-card {
+  background: var(--sf-paper);
+  border: 1px solid var(--sf-line);
+  border-left: 5px solid var(--sf-blue);
+  border-radius: 7px;
+  min-height: 92px;
+  padding: 13px 14px;
+}
+
+.sf-card strong {
+  color: var(--sf-ink);
+  display: block;
+  font-size: 0.94rem;
+  line-height: 1.25;
+  margin-bottom: 0.3rem;
+}
+
+.sf-card span {
+  color: var(--sf-muted);
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.sf-card.sf-data {
+  background: var(--sf-blue-soft);
+  border-left-color: var(--sf-blue);
+}
+
+.sf-card.sf-infra {
+  background: var(--sf-green-soft);
+  border-left-color: var(--sf-green);
+}
+
+.sf-card.sf-engine {
+  background: var(--sf-purple-soft);
+  border-left-color: var(--sf-purple);
+}
+
+.sf-card.sf-vault {
+  background: var(--sf-amber-soft);
+  border-left-color: var(--sf-amber);
+}
+
+.sf-card.sf-wide {
+  min-height: auto;
+  padding: 15px 18px;
+}
+
+.sf-card.sf-centred {
+  text-align: center;
+}
+
+.sf-card.sf-compact {
+  min-height: 78px;
+}
+
+.sf-arrow-row {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(var(--sf-cols, 1), minmax(0, 1fr));
+  height: 32px;
+  margin: 2px 0;
+}
+
+.sf-arrow {
+  min-height: 32px;
+  position: relative;
+}
+
+.sf-arrow::before {
+  border-left: 2px solid rgba(31, 95, 143, 0.46);
+  bottom: 8px;
+  content: "";
+  left: 50%;
+  position: absolute;
+  top: 3px;
+}
+
+.sf-arrow::after {
+  border-bottom: 2px solid rgba(31, 95, 143, 0.46);
+  border-right: 2px solid rgba(31, 95, 143, 0.46);
+  bottom: 4px;
+  content: "";
+  height: 8px;
+  left: calc(50% - 4px);
+  position: absolute;
+  transform: rotate(45deg);
+  width: 8px;
+}
+
+.sf-boundary {
+  align-items: center;
+  background: #fff7e7;
+  border: 1px dashed rgba(138, 95, 24, 0.45);
+  border-radius: 7px;
+  color: #6d4a10;
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 650;
+  justify-content: center;
+  line-height: 1.35;
+  margin: 0.55rem 0;
+  padding: 0.72rem 1rem;
+  text-align: center;
+}
+
+.sf-footer {
+  border-top: 1px solid var(--sf-line);
+  color: var(--sf-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin-top: 1.05rem;
+  padding-top: 0.9rem;
+  text-align: center;
+}
+
+@media (max-width: 860px) {
+  .sf-row-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .sf-chart {
+    padding: 16px;
+  }
+
+  .sf-row,
+  .sf-row-2,
+  .sf-row-3,
+  .sf-row-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sf-arrow-row {
+    display: none;
+  }
+
+  .sf-card {
+    min-height: auto;
+  }
+
+  .sf-section-label {
+    margin-top: 0.8rem;
+  }
+}

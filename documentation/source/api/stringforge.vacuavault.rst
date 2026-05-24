@@ -27,12 +27,9 @@ Schema constants
 Module-level constants and regexes that define the parquet layout
 and filename conventions.
 
-.. autosummary::
-    :toctree: _autosummary
-
-    SCHEMA_VERSION
-    RESERVED_NAMES
-    LABEL_SLUG_RE
+* :data:`SCHEMA_VERSION`
+* :data:`RESERVED_NAMES`
+* :data:`LABEL_SLUG_RE`
 
 
 Validation
@@ -44,11 +41,8 @@ injection: callers wanting physics validation pass ``db=`` and
 ``model_hash_fn=`` themselves; ``stringforge.vacuavault`` never
 imports a downstream package.
 
-.. autosummary::
-    :toctree: _autosummary
-
-    validate_parquet_file
-    split_by_validation
+* :func:`validate_parquet_file`
+* :func:`split_by_validation`
 
 
 Server-side CI helpers
@@ -60,12 +54,9 @@ variants live in downstream-package wrappers (e.g. a
 ``jaxvacua-vault`` CLI in :mod:`jaxvacua` that injects an
 ``LCSDatabase``-backed model loader).
 
-.. autosummary::
-    :toctree: _autosummary
-
-    validate_pr_diff
-    rebuild_catalog
-    curate_submission
+* :func:`validate_pr_diff`
+* :func:`rebuild_catalog`
+* :func:`curate_submission`
 
 
 Typical usage
@@ -113,5 +104,5 @@ See also
 
 * :doc:`stringforge.cy_io` — the geometry-database I/O layer that
   ``vacuavault`` reads schema constants from.
-* The dataset card at ``stringforge/vacua_vault/vacua_vault_dataset_card.md``
+* The dataset card at ``vacua_vault/vacua_vault_dataset_card.md``
   for the public-facing schema and contribution workflow.

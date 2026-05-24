@@ -2,12 +2,13 @@
 
 ## Overview
 
-stringforge provides access to large databases of Calabi-Yau threefold geometries through a unified interface. The data is hosted on [HuggingFace](https://huggingface.co/datasets/aschachner/cy-database) and downloaded on demand — only the files you actually need are fetched and cached locally.
+StringForge provides access to large databases of Calabi-Yau threefold geometries through a unified interface. The data is hosted on [HuggingFace](https://huggingface.co/datasets/aschachner/cy-database) and downloaded on demand — only the files you actually need are fetched and cached locally.
 
-Two databases are currently available:
+Three databases are currently available:
 
 - **Toric Divisor Flux (TDF)** models from the [Kreuzer-Skarke list](https://arxiv.org/abs/hep-th/0002240), identified by `(ks_id, triang_id)`. These are Calabi-Yau hypersurfaces in toric varieties, constructed from reflexive polytopes.
 - **Complete Intersection Calabi-Yau (CICY)** models from the [CICY list](https://arxiv.org/abs/hep-th/8602060), identified by `cicy_id`.
+- **KKLT vacua** — a curated subset of TDF (polytopes with `n_rigids_dual > h12`) indexed by **conifold class**, with a built-in run-tracking layer for persistent provenance of cluster work. Hosted in a separate HuggingFace repo `aschachner/kklt-vacua-database`. See [kklt_vacua_database](kklt_vacua_database.md) for details.
 
 Each model in the database carries:
 - Topological data: intersection numbers $\kappa_{ijk}$, second Chern class $c_2$, Euler characteristic $\chi$, Hodge numbers $h^{1,1}$ and $h^{2,1}$
@@ -18,7 +19,7 @@ Each model in the database carries:
 
 ## Two ways to load models
 
-The stringforge ecosystem supports two complementary ways to load Calabi-Yau geometry:
+The StringForge ecosystem supports two complementary ways to load Calabi-Yau geometry:
 
 ### Local models (`model_ID`)
 
@@ -49,6 +50,11 @@ model = db.load_model(ks_id=12345, triang_id=0, Q=24)
 ```
 
 This requires the `huggingface-hub`, `pandas`, and `pyarrow` packages, plus `jaxvacua` (only invoked at the model-construction stage; pure I/O does not need it).
+
+```{eval-rst}
+.. raw:: html
+   :file: ../_static/figures/f2_database_flow.html
+```
 
 ## How the database is organised
 
@@ -151,7 +157,6 @@ For HPC clusters without internet access:
 - {doc}`Tutorial notebook: Cluster parallelisation <../tutorials/database_and_infrastructure/cluster_parallelisation>`
 - {doc}`API reference: stringforge.cy_io <../api/stringforge.cy_io>`
 - {doc}`API reference: stringforge.lcs_database <../api/stringforge.lcs_database>`
-- {doc}`Migration from jaxvacua <../ecosystem/migration_from_jaxvacua>` — module rename and the 2026-05-01 mirror-convention swap.
 
 ### Physics background
 
@@ -159,9 +164,9 @@ The physics intros (Calabi–Yau geometries, periods, flux compactifications,
 moduli stabilisation, perturbatively flat vacua, Type-IIB supergravity) live
 in the JAXVacua documentation and are not duplicated here:
 
-- {external+jaxvacua:doc}`intro/geometries` — Calabi–Yau threefolds, KS polytopes, CICYs.
-- {external+jaxvacua:doc}`intro/periods` — period vector and prepotential.
-- {external+jaxvacua:doc}`intro/flux_compactifications` — Type-IIB flux backgrounds.
-- {external+jaxvacua:doc}`intro/moduli_stabilisation` — moduli stabilisation patterns.
-- {external+jaxvacua:doc}`intro/pfv` — perturbatively flat vacua.
-- {external+jaxvacua:doc}`intro/sugra` — 4-D N=1 Type-IIB supergravity.
+- [Calabi-Yau geometries](https://jaxvacua.readthedocs.io/en/latest/intro/geometries.html) — Calabi-Yau threefolds, KS polytopes, CICYs.
+- [Period calculations](https://jaxvacua.readthedocs.io/en/latest/intro/periods.html) — period vector and prepotential.
+- [Type IIB flux compactifications](https://jaxvacua.readthedocs.io/en/latest/intro/flux_compactifications.html) — Type-IIB flux backgrounds.
+- [Moduli stabilisation](https://jaxvacua.readthedocs.io/en/latest/intro/moduli_stabilisation.html) — moduli stabilisation patterns.
+- [Perturbatively flat vacua](https://jaxvacua.readthedocs.io/en/latest/intro/pfv.html) — perturbatively flat vacua.
+- [Type-IIB supergravity](https://jaxvacua.readthedocs.io/en/latest/intro/sugra.html) — 4-D N=1 Type-IIB supergravity.

@@ -18,8 +18,11 @@ Users can either call the methods directly on an explicit ``VacuaWriter(db)``
 instance, or use the thin delegation methods exposed on
 :class:`stringforge.lcs_database.LCSDatabase` — both paths call the same code.
 
+.. raw:: html
+   :file: ../_static/figures/f3_vault_workflow.html
+
 .. autosummary::
-    :toctree: _autosummary
+    :toctree: ../_autosummary
     :template: custom-class-template.rst
 
     VacuaWriter
@@ -28,40 +31,31 @@ instance, or use the thin delegation methods exposed on
 Local / vault operations
 -----------------------------------
 
-.. autosummary::
-    :toctree: _autosummary
-
-    VacuaWriter.designate_vacua
-    VacuaWriter.retract_designated
-    VacuaWriter.purge_retracted
-    VacuaWriter.query_designated
-    VacuaWriter.load_designated
-    VacuaWriter.designated_info
-    VacuaWriter.load_local_vacua
+* :meth:`VacuaWriter.designate_vacua`
+* :meth:`VacuaWriter.retract_designated`
+* :meth:`VacuaWriter.purge_retracted`
+* :meth:`VacuaWriter.query_designated`
+* :meth:`VacuaWriter.load_designated`
+* :meth:`VacuaWriter.designated_info`
+* :meth:`VacuaWriter.load_local_vacua`
 
 
 HuggingFace Hub operations
 -----------------------------------
 
-.. autosummary::
-    :toctree: _autosummary
-
-    VacuaWriter.push_vacua_to_hub
-    VacuaWriter.fetch_vacua_from_hub
-    VacuaWriter.list_hub_vacua
+* :meth:`VacuaWriter.push_vacua_to_hub`
+* :meth:`VacuaWriter.fetch_vacua_from_hub`
+* :meth:`VacuaWriter.list_hub_vacua`
 
 
 Session-tier helpers
 -----------------------------------
 
-.. autosummary::
-    :toctree: _autosummary
-
-    VacuaWriter.vacua_writer
-    VacuaWriter.query_vacua
-    VacuaWriter.load_vacua
-    VacuaWriter.solution_exists
-    VacuaWriter.find_similar_vacua
-    VacuaWriter.vacua_info
-    VacuaWriter.delete_vacua
-    VacuaWriter.validate_vacua
+* :meth:`VacuaWriter.vacua_writer`
+* :meth:`VacuaWriter.query_vacua`
+* :meth:`VacuaWriter.load_vacua`
+* :meth:`VacuaWriter.solution_exists`
+* :meth:`VacuaWriter.find_similar_vacua`
+* :meth:`VacuaWriter.vacua_info`
+* :meth:`VacuaWriter.delete_vacua`
+* :meth:`VacuaWriter.validate_vacua`

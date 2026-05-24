@@ -1,9 +1,16 @@
+from pathlib import Path
+
 from setuptools import setup
+
+
+ROOT = Path(__file__).parent
 
 setup(
     name='stringforge',
-    version='0.0.2',
+    version='0.1.0',
     description='Differentiable tools for string compactifications with JAX.',
+    long_description=(ROOT / 'README.md').read_text(encoding='utf-8'),
+    long_description_content_type='text/markdown',
     author='Andreas Schachner',
     author_email='as3475@cornell.edu',
     url='https://github.com/AndreasSchachner/stringforge',
@@ -11,34 +18,18 @@ setup(
     # validation/curation tooling for the HF dataset repo).
     packages=['stringforge', 'stringforge.vacuavault'],
     python_requires='>=3.12',
-    # NOTE: jaxvacua/kahlerjax/jaxiverse intentionally do NOT live in
-    # install_requires — those are *downstream* sibling packages that
-    # depend on stringforge (not the other way round).  Listing them as
-    # hard deps would create a circular pip dependency.  They're
-    # surfaced lazily via try/except in stringforge/__init__.py and via
-    # the ``[full]`` extra below for users who want one-shot install.
     install_requires=[
         'numpy',
         'jax',
         'jaxlib',
-        'optax',
-        'matplotlib',
-        'seaborn',
-        'h5py',
         'pandas',
-        'tqdm',
-        'sympy',
-        # Vault layer (cy_io + vacuavault) needs these:
         'pyarrow',
         'huggingface_hub',
-        'jaxpolylog@git+https://github.com/AndreasSchachner/jaxpolylog.git#egg=jaxpolylog',
-        'jaxvacua@git+https://github.com/AndreasSchachner/jaxvacua.git#egg=jaxvacua',
-        'kahlerjax@git+https://github.com/AndreasSchachner/kahlerjax.git#egg=kahlerjax',
-        'jaxiverse@git+https://github.com/AndreasSchachner/jaxiverse.git#egg=jaxiverse',
+        'jaxpolylog',
+        'jaxvacua',
     ],
-    license='GPL-3.0',
+    license='GPL-3.0-only',
     classifiers=[
-        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.12',
         'Intended Audience :: Science/Research',

@@ -460,7 +460,7 @@ class CYDatabase:
         tree = db.load(ks_id=12345, triang_id=0, include_gv=True, maximum_degree=5)
         tree = db.load(ks_id=12345, triang_id=0, include_conifolds=True)
 
-        # Load directly as a flux_sector model
+        # Load directly as a FluxVacuaFinder model
         model = db.load_model(ks_id=12345, triang_id=0, Q=24)
 
         # Batch and random sampling

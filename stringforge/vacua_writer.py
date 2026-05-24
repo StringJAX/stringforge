@@ -28,6 +28,8 @@ import uuid
 import warnings
 from collections import OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
@@ -52,6 +54,36 @@ from .cy_io import (
     DEFAULT_VAULT_REPO,
     HF_REPO_ID,
 )
+
+
+@contextmanager
+def _file_lock(path: Path):
+    r"""
+    **Description:**
+    Advisory exclusive lock on a sibling ``.lock`` file.  Used to
+    serialise multi-process appends to the designated-vacua catalog so
+    that concurrent ``designate_vacua`` calls do not allocate
+    overlapping ``designated_id`` ranges.
+
+    Falls back to a no-op on platforms without :mod:`fcntl` (Windows).
+    """
+    try:
+        import fcntl
+    except ImportError:
+        yield
+        return
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fh = open(lock_path, "a+")
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        finally:
+            fh.close()
+
 
 def _compute_model_hash(tree: Any) -> str:
     r"""
@@ -91,8 +123,8 @@ def _extract_model_identity(
     r"""
     **Description:**
     Extract or assemble model identity fields.  If *model* is provided
-    (a ``flux_sector`` or ``lcs_tree``), identity is read from the tree;
-    explicit keyword arguments override.
+    (a ``FluxVacuaFinder``, ``FluxEFT``, or ``lcs_tree``), identity is read
+    from the tree; explicit keyword arguments override.
 
     Returns:
         Dict with keys ``h11``, ``h12``, ``ks_id``, ``triang_id``,
@@ -100,7 +132,7 @@ def _extract_model_identity(
     """
     tree = None
     if model is not None:
-        # Accept either flux_sector (has .periods.lcs_tree) or lcs_tree
+        # Accept JAXVacua model objects (with .periods.lcs_tree) or lcs_tree.
         tree = getattr(getattr(model, "periods", None), "lcs_tree", model)
 
     _h11 = h11 if h11 is not None else (getattr(tree, "h11", None) if tree else None)
@@ -362,7 +394,7 @@ class _VacuaStreamWriter:
         run_id (str): UUID of this run.
         method (str): Sampling method label.
         metadata (dict | None): Arbitrary run-level metadata (JSON-serialisable).
-        model: Optional ``flux_sector`` for derived-quantity computation.
+        model: Optional JAXVacua model for derived-quantity computation.
         compute_derived (bool): If True and *model* is set, compute W, DW,
             N_flux at flush time.
         filter_fn: Optional callable ``result_dict → bool``.
@@ -403,11 +435,13 @@ class _VacuaStreamWriter:
         self._seen_fluxes: set = set()
 
         # Determine output path
+        h11 = identity["h11"]
+        h12 = identity["h12"]
         ks = identity["ks_id"]
         tr = identity["triang_id"]
         if ks >= 0 and tr >= 0:
             self._run_dir = (
-                vacua_dir / f"ks_{ks}" / f"triang_{tr}"
+                vacua_dir / f"h11_{h11}_h12_{h12}_ksid_{ks}" / f"triang_{tr}"
             )
         else:
             mhash = identity["model_hash"]
@@ -599,6 +633,13 @@ class _VacuaStreamWriter:
         r"""Number of duplicate flux vectors skipped."""
         return self._n_duplicates_skipped
 
+    @property
+    def run_id(self) -> str:
+        r"""UUID of this run (matches the ``run_id`` column on every
+        appended row).  Use this to query back the written rows via
+        :meth:`VacuaWriter.query_vacua(run_id=writer.run_id)`."""
+        return self._run_id
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -741,7 +782,8 @@ class VacuaWriter:
 
         - Local KS models (bundled; loaded via ``(h12, model_ID)``) →
           ``<vault>/KS/h12_{h12}_model_{model_ID}/``.
-        - HF-downloaded TDF models → ``<vault>/tdf/ks_{ks_id}_tri_{triang_id}/``.
+        - HF-downloaded TDF models →
+          ``<vault>/tdf/h11_{h11}_h12_{h12}/ks_{ks_id}_tri_{triang_id}/``.
         - HF-downloaded CICY models → ``<vault>/cicy/cicy_{cicy_id}/``.
         - Fallback (custom model) → ``<vault>/custom/{model_hash}/``.
         """
@@ -751,12 +793,18 @@ class VacuaWriter:
         ks = ident.get("ks_id", -1)
         tr = ident.get("triang_id", -1)
         cicy_id = ident.get("cicy_id", -1)
+        h11    = ident.get("h11")
         h12    = ident.get("h12")
         name   = ident.get("model_name") or ""
         mhash  = ident.get("model_hash") or ""
 
         if ks >= 0 and tr >= 0:
-            return vault / "tdf" / f"ks_{ks}_tri_{tr}"
+            return (
+                vault
+                / "tdf"
+                / f"h11_{h11}_h12_{h12}"
+                / f"ks_{ks}_tri_{tr}"
+            )
         if cicy_id >= 0:
             return vault / "cicy" / f"cicy_{cicy_id}"
 
@@ -802,7 +850,7 @@ class VacuaWriter:
         set ``model_name`` for human-readable identification.
 
         Args:
-            model: A ``flux_sector`` or ``lcs_tree`` instance.  Used both
+            model: A JAXVacua model or ``lcs_tree`` instance.  Used both
                 for identity extraction and (if *compute_derived* is True)
                 for computing W, DW, N_flux.
             h11 (int | None): Override :math:`h^{1,1}`.
@@ -1021,7 +1069,7 @@ class VacuaWriter:
         Args:
             flux: Integer array of length ``2 * n_fluxes``.
             h11, h12, ks_id, triang_id: Model identity (used to filter runs).
-            model: Alternative — extract identity from a ``flux_sector`` or
+            model: Alternative — extract identity from a JAXVacua model or
                 ``lcs_tree``.
 
         Returns:
@@ -1253,6 +1301,7 @@ class VacuaWriter:
         check_tadpole: bool = True,
         check_physics: bool = True,
         check_duplicates: bool = True,
+        identity: Optional[Dict[str, Any]] = None,
     ) -> List[dict]:
         r"""
         **Description:**
@@ -1266,7 +1315,7 @@ class VacuaWriter:
         Args:
             vacua_df: ``pandas.DataFrame`` of vacuum rows (as returned by
                 :meth:`query_vacua`).
-            model: Optional ``flux_sector`` for physics re-verification.
+            model: Optional JAXVacua model for physics re-verification.
                 When provided, F-terms and tadpole are recomputed from the
                 stored flux and moduli vectors.
             F_term_tol (float): Maximum allowed ``|F_i|`` for a solution to
@@ -1276,6 +1325,9 @@ class VacuaWriter:
                 (requires *model*).
             check_duplicates (bool): Check flux vectors against existing
                 designated solutions.
+            identity (dict | None): Optional model identity used to scope
+                duplicate checks.  When provided, a flux vector only counts
+                as duplicate if it is already designated for the same model.
 
         Returns:
             List[dict]: One report entry per row with keys ``"index"``,
@@ -1292,6 +1344,23 @@ class VacuaWriter:
         if check_duplicates:
             self._ensure_designated_catalog()
             dcat = self._designated_catalog
+            if (
+                identity is not None
+                and dcat is not None
+                and len(dcat) > 0
+            ):
+                mask = np.ones(len(dcat), dtype=bool)
+                for key in (
+                    "h11", "h12", "ks_id", "triang_id",
+                    "conifold_id", "cicy_id", "model_hash", "model_name",
+                ):
+                    if key not in dcat.columns or key not in identity:
+                        continue
+                    value = identity.get(key)
+                    if value is None or value == "":
+                        continue
+                    mask &= (dcat[key] == value).values
+                dcat = dcat[mask]
             if dcat is not None and len(dcat) > 0 and "flux" in dcat.columns:
                 for fl in dcat["flux"]:
                     existing_fluxes.add(tuple(int(x) for x in fl))
@@ -1391,7 +1460,7 @@ class VacuaWriter:
             vacua_df: Vacuum rows to upload.
             label (str): Dataset label (filesystem-safe).
             committed_by (str): Contributor identifier.
-            model: Optional ``flux_sector`` for F-term re-verification.
+            model: Optional JAXVacua model for F-term re-verification.
             F_term_tol (float): F-term tolerance.  Defaults to ``1e-6``.
             check_remote (bool): Check schema + catalog on the remote
                 repo.  Requires network; skipped automatically when
@@ -1500,7 +1569,7 @@ class VacuaWriter:
             label (str): Filesystem-safe slug for the output file.
             committed_by (str): Contributor identifier (ORCID preferred;
                 HF username accepted).
-            model: Required ``flux_sector`` for identity extraction and
+            model: Required JAXVacua model for identity extraction and
                 physics validation.
             tags (list | None): Free-form tags attached to the dataset.
             notes (str): Free-text annotation.
@@ -1555,6 +1624,11 @@ class VacuaWriter:
             raise ValueError(
                 f"if_exists must be 'error', 'append', or 'new_version', "
                 f"got {if_exists!r}"
+            )
+        if if_exists == "append" and create_pr:
+            raise ValueError(
+                "if_exists='append' requires create_pr=False because it "
+                "performs a read-modify-write upload."
             )
 
         pd = _require_pandas()
@@ -1669,6 +1743,24 @@ class VacuaWriter:
         }
 
         with tempfile.TemporaryDirectory() as tmpdir:
+            if if_exists == "append":
+                try:
+                    existing_path = hf_download(
+                        repo_id=repo,
+                        filename=final_rel,
+                        repo_type="dataset",
+                        local_dir=tmpdir,
+                        token=token,
+                    )
+                    existing_df = pd.read_parquet(existing_path)
+                except Exception:
+                    existing_df = None
+                if existing_df is not None and len(existing_df) > 0:
+                    valid_df = _safe_concat(
+                        [existing_df, valid_df], ignore_index=True,
+                    )
+                    result["n_uploaded"] = len(valid_df)
+
             # Valid file
             local_main = os.path.join(tmpdir, os.path.basename(final_rel))
             _write_with_metadata(valid_df, local_main, arrow_meta)
@@ -1741,7 +1833,7 @@ class VacuaWriter:
         for a given model from the HuggingFace vacua repo.
 
         Args:
-            model: Optional ``flux_sector`` for identity extraction.
+            model: Optional JAXVacua model for identity extraction.
             ks_id, triang_id, cicy_id: Explicit identity overrides.
             label (str | None): If given, match only files whose name
                 starts with this label (before any ``_v{n}`` suffix).
@@ -2018,7 +2110,7 @@ class VacuaWriter:
             label (str): Human-readable label (e.g. ``"benchmark_ISD"``,
                 ``"paper:2506.xxxxx"``).
             committed_by (str): Author identifier (name or ORCID).
-            model: Optional ``flux_sector`` for identity extraction and
+            model: Optional JAXVacua model for identity extraction and
                 physics validation.
             h11, h12, ks_id, triang_id, conifold_id, cicy_id: Explicit
                 model identity overrides.
@@ -2056,6 +2148,7 @@ class VacuaWriter:
         if validate:
             report = self.validate_vacua(
                 vacua_df, model=model, F_term_tol=F_term_tol,
+                identity=identity,
             )
             n_failed = sum(1 for r in report if not r["passed"])
             if n_failed > 0 and not force:
@@ -2080,120 +2173,124 @@ class VacuaWriter:
         else:
             tags_json = json.dumps(list(tags))
 
-        # Determine next designated_id
-        self._ensure_designated_catalog()
-        dcat = self._designated_catalog
-        if dcat is not None and len(dcat) > 0:
-            next_id = int(dcat["designated_id"].max()) + 1
-        else:
-            next_id = 0
-
-        # Get jaxvacua version
         try:
-            from jaxvacua import __version__ as _jv_version
-        except ImportError:
+            _jv_version = version("jaxvacua")
+        except PackageNotFoundError:
             _jv_version = "unknown"
 
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now   = datetime.datetime.now(datetime.timezone.utc)
         today = now.date().isoformat()
 
-        # Build catalog rows and data rows
-        catalog_rows = []
-        data_rows = []
-        assigned_ids = []
-
-        for i in range(len(vacua_df)):
-            row = vacua_df.iloc[i]
-            did = next_id + i
-            assigned_ids.append(did)
-
-            # Merge tags: existing row tags + new tags
-            existing_tags = []
-            if "tags" in vacua_df.columns:
-                try:
-                    et = row["tags"]
-                    if isinstance(et, str):
-                        existing_tags = json.loads(et)
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            new_tags = json.loads(tags_json)
-            merged_tags = list(dict.fromkeys(existing_tags + new_tags))
-
-            # Source run_id
-            source_run = str(row.get("run_id", "")) if "run_id" in vacua_df.columns else ""
-
-            catalog_rows.append({
-                "designated_id": did,
-                "h11":           identity["h11"],
-                "h12":           identity["h12"],
-                "ks_id":         identity["ks_id"],
-                "triang_id":     identity["triang_id"],
-                "conifold_id":   identity["conifold_id"],
-                "cicy_id":       identity["cicy_id"],
-                "model_hash":    identity["model_hash"],
-                "model_name":    identity.get("model_name"),
-                "flux":          list(int(x) for x in row["flux"]),
-                "N_flux":        row.get("N_flux"),
-                "is_susy":       bool(row.get("is_susy", False)),
-                "tags":          json.dumps(merged_tags),
-                "label":         label,
-                "notes":         notes,
-                "committed_by":  committed_by,
-                "commit_date":   today,
-                "jaxvacua_version": _jv_version,
-                "source_run_id": source_run,
-                "retracted":     False,
-                "retraction_reason": None,
-            })
-
-            # Data row — copy the solution data plus designated_id
-            drow = {
-                "designated_id": did,
-                "flux":          list(int(x) for x in row["flux"]),
-                "moduli_re":     list(row["moduli_re"]) if "moduli_re" in vacua_df.columns else None,
-                "moduli_im":     list(row["moduli_im"]) if "moduli_im" in vacua_df.columns else None,
-                "tau_re":        row.get("tau_re"),
-                "tau_im":        row.get("tau_im"),
-                "W_re":          row.get("W_re"),
-                "W_im":          row.get("W_im"),
-                "F_terms_re":    row.get("F_terms_re"),
-                "F_terms_im":    row.get("F_terms_im"),
-                "N_flux":        row.get("N_flux"),
-                "residual":      row.get("residual"),
-                "is_susy":       bool(row.get("is_susy", False)),
-                "tags":          json.dumps(merged_tags),
-                "extra_data":    row.get("extra_data"),
-                "label":         label,
-                "committed_by":  committed_by,
-                "commit_date":   today,
-            }
-            data_rows.append(drow)
-
-        # Determine shard path — per-model subdirectory inside vacua_vault/
-        shard_dir = self._resolve_vacua_dir(model=model, **{
-            k: identity[k] for k in (
-                "h11", "h12", "ks_id", "triang_id",
-                "conifold_id", "cicy_id", "model_name",
-            ) if k in identity
-        })
-        shard_dir.mkdir(parents=True, exist_ok=True)
-        shard_path = shard_dir / "shard_0.parquet"
-
-        # Append to shard
-        data_df = pd.DataFrame(data_rows)
-        if shard_path.exists():
-            existing = pd.read_parquet(shard_path)
-            data_df = _safe_concat([existing, data_df], ignore_index=True)
-        data_df.to_parquet(shard_path, index=False)
-
-        # Update catalog
-        catalog_df = pd.DataFrame(catalog_rows)
-        catalog_path = self._designated_dir / "designated_vacua_catalog.parquet"
         self._designated_dir.mkdir(parents=True, exist_ok=True)
-        if dcat is not None and len(dcat) > 0:
-            catalog_df = _safe_concat([dcat, catalog_df], ignore_index=True)
-        catalog_df.to_parquet(catalog_path, index=False)
-        self._designated_catalog = catalog_df
+        catalog_path = (
+            self._designated_dir / "designated_vacua_catalog.parquet"
+        )
+
+        # ``designate_vacua`` assigns a contiguous range of integer IDs
+        # starting from ``max(existing) + 1``.  Serialise the read of
+        # the catalog, the ID allocation, and the write so concurrent
+        # cluster workers cannot collide.
+        with _file_lock(catalog_path):
+            self._designated_catalog = None
+            self._ensure_designated_catalog()
+            dcat = self._designated_catalog
+            if dcat is not None and len(dcat) > 0:
+                next_id = int(dcat["designated_id"].max()) + 1
+            else:
+                next_id = 0
+
+            catalog_rows: List[Dict[str, Any]] = []
+            data_rows:    List[Dict[str, Any]] = []
+            assigned_ids: List[int]            = []
+
+            for i in range(len(vacua_df)):
+                row = vacua_df.iloc[i]
+                did = next_id + i
+                assigned_ids.append(did)
+
+                existing_tags: List[str] = []
+                if "tags" in vacua_df.columns:
+                    try:
+                        et = row["tags"]
+                        if isinstance(et, str):
+                            existing_tags = json.loads(et)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                new_tags    = json.loads(tags_json)
+                merged_tags = list(dict.fromkeys(existing_tags + new_tags))
+
+                source_run = (
+                    str(row.get("run_id", ""))
+                    if "run_id" in vacua_df.columns else ""
+                )
+
+                catalog_rows.append({
+                    "designated_id": did,
+                    "h11":           identity["h11"],
+                    "h12":           identity["h12"],
+                    "ks_id":         identity["ks_id"],
+                    "triang_id":     identity["triang_id"],
+                    "conifold_id":   identity["conifold_id"],
+                    "cicy_id":       identity["cicy_id"],
+                    "model_hash":    identity["model_hash"],
+                    "model_name":    identity.get("model_name"),
+                    "flux":          list(int(x) for x in row["flux"]),
+                    "N_flux":        row.get("N_flux"),
+                    "is_susy":       bool(row.get("is_susy", False)),
+                    "tags":          json.dumps(merged_tags),
+                    "label":         label,
+                    "notes":         notes,
+                    "committed_by":  committed_by,
+                    "commit_date":   today,
+                    "jaxvacua_version": _jv_version,
+                    "source_run_id": source_run,
+                    "retracted":     False,
+                    "retraction_reason": None,
+                })
+
+                data_rows.append({
+                    "designated_id": did,
+                    "flux":          list(int(x) for x in row["flux"]),
+                    "moduli_re":     list(row["moduli_re"]) if "moduli_re" in vacua_df.columns else None,
+                    "moduli_im":     list(row["moduli_im"]) if "moduli_im" in vacua_df.columns else None,
+                    "tau_re":        row.get("tau_re"),
+                    "tau_im":        row.get("tau_im"),
+                    "W_re":          row.get("W_re"),
+                    "W_im":          row.get("W_im"),
+                    "F_terms_re":    row.get("F_terms_re"),
+                    "F_terms_im":    row.get("F_terms_im"),
+                    "N_flux":        row.get("N_flux"),
+                    "residual":      row.get("residual"),
+                    "is_susy":       bool(row.get("is_susy", False)),
+                    "tags":          json.dumps(merged_tags),
+                    "extra_data":    row.get("extra_data"),
+                    "label":         label,
+                    "committed_by":  committed_by,
+                    "commit_date":   today,
+                })
+
+            shard_dir = self._resolve_vacua_dir(model=model, **{
+                k: identity[k] for k in (
+                    "h11", "h12", "ks_id", "triang_id",
+                    "conifold_id", "cicy_id", "model_name",
+                ) if k in identity
+            })
+            shard_dir.mkdir(parents=True, exist_ok=True)
+            shard_path = shard_dir / "shard_0.parquet"
+
+            data_df = pd.DataFrame(data_rows)
+            if shard_path.exists():
+                existing = pd.read_parquet(shard_path)
+                data_df  = _safe_concat([existing, data_df], ignore_index=True)
+            data_df.to_parquet(shard_path, index=False)
+
+            catalog_df = pd.DataFrame(catalog_rows)
+            if dcat is not None and len(dcat) > 0:
+                catalog_df = _safe_concat(
+                    [dcat, catalog_df], ignore_index=True,
+                )
+            catalog_df.to_parquet(catalog_path, index=False)
+            self._designated_catalog = catalog_df
 
         return assigned_ids
     def query_designated(
@@ -2418,7 +2515,7 @@ class VacuaWriter:
         designated for that model.
 
         Args:
-            model: Optional ``flux_sector`` or ``lcs_tree`` used for
+            model: Optional JAXVacua model or ``lcs_tree`` used for
                 identity extraction.
             label (str | None): If given, filter by designation label.
             include_retracted (bool): Include retracted entries.

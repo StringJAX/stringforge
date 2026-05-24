@@ -193,7 +193,7 @@ def validate_parquet_file(
 
     Args:
         path:                    Path to the parquet file.
-        model:                   Optional pre-built ``flux_sector``
+        model:                   Optional pre-built ``FluxVacuaFinder``
             for F-term + tadpole verification.  Wins over ``db`` /
             ``physics_checks`` auto-load: if supplied, no auto-load is
             attempted.
