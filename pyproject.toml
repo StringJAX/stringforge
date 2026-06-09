@@ -1,3 +1,40 @@
 [build-system]
 requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "stringforge"
+version = "0.1.0"
+description = "Shared database, model-loading, and vacua-vault infrastructure for string compactifications."
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "jax",
+    "jaxlib",
+    "pandas",
+    "pyarrow",
+    "huggingface_hub",
+    "jaxpolylog",
+    "jaxvacua",
+]
+# Fields below are still owned by setup.py; declaring them dynamic
+# lets setuptools accept the values without rejecting the build.
+dynamic = ["readme", "license", "authors", "classifiers"]
+
+[project.optional-dependencies]
+sync = ["huggingface_hub"]
+ml   = ["datasets"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".pytest_cache",
+    "build",
+    "dist",
+    "documentation/build",
+    "documentation/source/_autosummary",
+    "private",
+    "*.egg-info",
+    "vacua_vault",
+]

@@ -11,7 +11,7 @@ Database classes
 
 Pure-I/O classes for reading the HuggingFace-hosted ``cy-database``.  These
 classes have **no downstream-package dependencies** and serve as the shared
-geometry-database layer for jaxvacua, kahlerjax, and other sibling packages.
+geometry-database layer for JAXVacua and planned sibling packages.
 For model construction (``lcs_tree`` / ``FluxVacuaFinder``) and vacua
 persistence, see ``stringforge.lcs_database`` and ``stringforge.vacua_writer``.
 

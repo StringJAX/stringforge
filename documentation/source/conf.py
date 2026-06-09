@@ -11,7 +11,7 @@ from sphinx.ext import autosummary as _sphinx_autosummary
 
 sys.path.insert(0, os.path.abspath("../.."))
 
-warnings.filterwarnings("ignore", message="TODO: Two neighbors is broken!")
+warnings.filterwarnings("ignore", message=r".*Two neighbors is broken!")
 logging.getLogger("cvxpy").setLevel(logging.CRITICAL)
 
 _logging_log = logging.Logger._log
@@ -62,13 +62,14 @@ napoleon_custom_sections = [("Returns", "params_style")]
 # Cross-package links go here.  Sibling-package mappings are added when the
 # corresponding public documentation exposes a stable objects.inv inventory.
 intersphinx_mapping = {
-    "python":   ("https://docs.python.org/3", None),
-    "numpy":    ("https://numpy.org/doc/stable/", None),
-    "jax":      ("https://docs.jax.dev/en/latest/", None),
-    # "jaxvacua": ("https://jaxvacua.readthedocs.io/en/latest/", None),
+    "python":     ("https://docs.python.org/3",                    None),
+    "numpy":      ("https://numpy.org/doc/stable/",                None),
+    "jax":        ("https://docs.jax.dev/en/latest/",              None),
+    "jaxpolylog": ("https://jaxpolylog.readthedocs.io/en/latest/", None),
+    # "jaxvacua":  ("https://jaxvacua.readthedocs.io/en/latest/",    None),
     # "cytools":   ("https://cy.tools/",                             None),  # add when stable RTD URL exists
-    # "kahlerjax": ("https://kahlerjax.readthedocs.io/en/latest/",    None),  # add when public
-    # "jaxiverse": ("https://jaxiverse.readthedocs.io/en/latest/",    None),  # add when public
+    # "kahlerjax": ("https://kahlerjax.readthedocs.io/en/latest/",   None),  # add when public
+    # "jaxiverse": ("https://jaxiverse.readthedocs.io/en/latest/",   None),  # add when public
 }
 
 source_suffix = {

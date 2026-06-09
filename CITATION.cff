@@ -1,0 +1,48 @@
+cff-version: 1.2.0
+message: >-
+  If you use StringForge, please cite both the companion paper
+  (preferred citation, in preparation) and the software release.
+  Where relevant, additionally cite the upstream JAXVacua framework
+  (Dubey, Krippendorf, Schachner 2023).
+title: "StringForge: shared infrastructure for string-compactification workflows"
+authors:
+  - family-names: Schachner
+    given-names: Andreas
+version: 0.1.0
+date-released: 2026-05-25
+license: GPL-3.0-only
+repository-code: "https://github.com/AndreasSchachner/stringforge"
+abstract: >-
+  StringForge provides database access, cache/offline workflows,
+  model-loading bridges into physics engines such as JAXVacua, and persistent
+  vacua-vault infrastructure with provenance for string-compactification workflows.
+
+# Preferred citation: the single-author companion paper currently in
+# preparation.  Bibliographic identifiers will be filled in at submission.
+# Until then, citing the software release entry above already credits the
+# work; switch to this entry once the arXiv ID is assigned.
+preferred-citation:
+  type: article
+  title: "StringForge: shared database and vacuum-storage infrastructure for differentiable type IIB flux-compactification workflows"
+  authors:
+    - family-names: Schachner
+      given-names: Andreas
+  year: 2026
+  status: in-preparation
+  notes: "arXiv ID and journal/DOI to be added at submission."
+
+references:
+  - type: article
+    authors:
+      - family-names: Dubey
+        given-names: Abhishek
+      - family-names: Krippendorf
+        given-names: Sven
+      - family-names: Schachner
+        given-names: Andreas
+    title: "JAXVacua — a framework for sampling string vacua"
+    journal: JHEP
+    volume: "12"
+    year: 2023
+    doi: "10.1007/JHEP12(2023)146"
+    notes: "The upstream physics framework that StringForge ships infrastructure for; cite when StringForge is used to drive a JAXVacua flux-vacuum search."

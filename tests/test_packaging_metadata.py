@@ -1,4 +1,5 @@
 import re
+import tomllib
 from pathlib import Path
 
 
@@ -13,12 +14,14 @@ def _extract_assignment(text, name):
 
 def test_declared_versions_are_consistent():
     init_text = (REPO_ROOT / "stringforge" / "__init__.py").read_text()
-    setup_text = (REPO_ROOT / "setup.py").read_text()
+    pyproject_data = tomllib.loads(
+        (REPO_ROOT / "pyproject.toml").read_text()
+    )
     conf_text = (REPO_ROOT / "documentation" / "source" / "conf.py").read_text()
 
     versions = {
         "__init__.py": _extract_assignment(init_text, "__version__"),
-        "setup.py": _extract_assignment(setup_text, "version"),
+        "pyproject.toml": pyproject_data["project"]["version"],
         "documentation/source/conf.py": _extract_assignment(conf_text, "version"),
     }
 
@@ -30,6 +33,15 @@ def test_pypi_metadata_does_not_depend_on_git_urls():
 
     assert "@git+" not in setup_text
     assert "git+https://" not in setup_text
+
+
+def test_core_runtime_dependencies_include_huggingface_hub():
+    pyproject_data = tomllib.loads(
+        (REPO_ROOT / "pyproject.toml").read_text()
+    )
+
+    deps = set(pyproject_data["project"]["dependencies"])
+    assert "huggingface_hub" in deps
 
 
 def test_test_suite_uses_project_license_header():

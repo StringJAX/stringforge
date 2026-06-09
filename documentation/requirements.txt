@@ -12,7 +12,8 @@ nbsphinx
 Pygments
 jax
 jaxlib
-# Imported by tutorial notebooks; required at build time so the imports resolve.
-# `jaxpolylog`, `kahlerjax`, `jaxiverse` will be added when on PyPI.  Until then,
-# their imports in `ecosystem_pipeline.ipynb` are commented out.
+# Public ecosystem packages used by API docs and tutorial examples.
+jaxpolylog
 jaxvacua
+# KahlerJAX and JAXiverse are planned packages and are intentionally not
+# documentation-build dependencies for this release.

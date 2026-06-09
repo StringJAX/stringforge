@@ -1,0 +1,55 @@
+<div class="sf-fig" id="sf-kklt-flow">
+  <div class="sf-chart">
+    <h3 class="sf-title">KKLT curated-subset data flow</h3>
+    <p class="sf-caption">
+      KKLTDatabase adds conifold-class indexing and curation tags on top of
+      the TDF geometry database.  Geometry shards are still resolved through TDF.
+    </p>
+
+    <div class="sf-section-label">Underlying geometry source</div>
+    <div class="sf-row sf-row-1">
+      <div class="sf-card sf-data sf-wide sf-centred">
+        <strong>TDF catalogue and shards</strong>
+        <span>Geometry, GV data, conifold rows, and polytope data addressed by TDF keys.</span>
+      </div>
+    </div>
+
+    <div class="sf-arrow-row" style="--sf-cols: 1;"><div class="sf-arrow"></div></div>
+
+    <div class="sf-section-label">KKLT curated indices</div>
+    <div class="sf-row sf-row-3">
+      <div class="sf-card sf-infra">
+        <strong>polytope catalogue</strong>
+        <span>One row per selected <code>ks_id</code>, with rigidity and tadpole metadata.</span>
+      </div>
+      <div class="sf-card sf-infra">
+        <strong>conifold-class catalogue</strong>
+        <span>Groups conifolds by one-face divisor across triangulations.</span>
+      </div>
+      <div class="sf-card sf-infra">
+        <strong>conifold catalogue</strong>
+        <span>Stores logical links <code>(triang_id, tdf_conifold_id)</code> back to TDF.</span>
+      </div>
+    </div>
+
+    <div class="sf-arrow-row" style="--sf-cols: 3;">
+      <div class="sf-arrow"></div><div class="sf-arrow"></div><div class="sf-arrow"></div>
+    </div>
+
+    <div class="sf-section-label">Advanced workflows</div>
+    <div class="sf-row sf-row-3">
+      <div class="sf-card sf-engine">
+        <strong>load_model</strong>
+        <span>Resolves the logical TDF link and returns a JAXVacua model.</span>
+      </div>
+      <div class="sf-card sf-engine">
+        <strong>run_log.parquet</strong>
+        <span>Tracks class/conifold-scoped cluster campaigns and payloads.</span>
+      </div>
+      <div class="sf-card sf-vault">
+        <strong>vacua_vault metadata</strong>
+        <span>Designated vacua keep KKLT provenance fields inside the shared vault.</span>
+      </div>
+    </div>
+  </div>
+</div>

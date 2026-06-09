@@ -1,30 +1,25 @@
 <div class="sf-fig" id="sf-database-flow">
   <div class="sf-chart">
-    <h3 class="sf-title">Database-to-model flow</h3>
+    <h3 class="sf-title">Geometry data, curated subsets, and model loading</h3>
     <p class="sf-caption">
-      The database layer first serves catalogue-convention geometry data, then
-      the model-loading layer translates to the mirror convention used by the
-      JAXVacua physics objects.
+      TDF and CICY are geometry sources.  KKLT is a curated index that stores
+      conifold-class provenance, tags, and logical links back to TDF; it is not
+      a separate geometry source.
     </p>
 
-    <div class="sf-section-label">Remote parquet repositories</div>
-    <div class="sf-row sf-row-3">
+    <div class="sf-section-label">Geometry data sources</div>
+    <div class="sf-row sf-row-2">
       <div class="sf-card sf-data">
-        <strong>cy-database</strong>
-        <span>TDF and CICY catalogues with sharded geometry, GV, and conifold data.</span>
+        <strong>cy-database / TDF</strong>
+        <span>Kreuzer-Skarke catalogues with sharded geometry, GV, polytope, and conifold data.</span>
       </div>
       <div class="sf-card sf-data">
-        <strong>kklt-vacua-database</strong>
-        <span>Curated TDF subset indexed by conifold class and run provenance.</span>
-      </div>
-      <div class="sf-card sf-data">
-        <strong>Local cache</strong>
-        <span>Project-local parquet shards, optional offline mode, and LRU shard reuse.</span>
+        <strong>cy-database / CICY</strong>
+        <span>Complete-intersection catalogues with sharded geometry and derived model data.</span>
       </div>
     </div>
 
-    <div class="sf-arrow-row" style="--sf-cols: 3;">
-      <div class="sf-arrow"></div>
+    <div class="sf-arrow-row" style="--sf-cols: 2;">
       <div class="sf-arrow"></div>
       <div class="sf-arrow"></div>
     </div>
@@ -33,24 +28,24 @@
     <div class="sf-row sf-row-3">
       <div class="sf-card sf-infra">
         <strong>CYDatabase</strong>
-        <span>Common query, cache, shard-loading, and batch-loading machinery.</span>
+        <span>Common query, cache, shard-loading, schema, and offline machinery.</span>
       </div>
       <div class="sf-card sf-infra">
         <strong>TDFDatabase</strong>
-        <span>Kreuzer-Skarke models addressed by <code>ks_id</code> and <code>triang_id</code>.</span>
+        <span>TDF rows addressed by <code>ks_id</code> and <code>triang_id</code>.</span>
       </div>
       <div class="sf-card sf-infra">
         <strong>CICYDatabase</strong>
-        <span>Complete-intersection models addressed by <code>cicy_id</code>.</span>
+        <span>CICY rows addressed by <code>cicy_id</code>.</span>
       </div>
     </div>
 
     <div class="sf-boundary">
-      Convention boundary: catalogue columns use the original geometry labels;
-      LCS loaders expose mirror-convention <code>h11</code> and <code>h12</code>.
+      Convention boundary: catalogue columns use source-geometry labels;
+      LCSDatabase exposes mirror-convention <code>h11</code> and <code>h12</code>.
     </div>
 
-    <div class="sf-section-label">Mirror-convention model construction</div>
+    <div class="sf-section-label">Curated index and model bridge</div>
     <div class="sf-row sf-row-3">
       <div class="sf-card sf-engine">
         <strong>LCSDatabase</strong>
@@ -58,11 +53,11 @@
       </div>
       <div class="sf-card sf-engine">
         <strong>KKLTDatabase</strong>
-        <span>Loads the KKLT-oriented subset with conifold-class provenance.</span>
+        <span>Advanced <code>kklt</code> index: conifold classes, logical TDF links, and tags.</span>
       </div>
       <div class="sf-card sf-engine">
         <strong>Batch and sample APIs</strong>
-        <span>Iterate, query, and sample compatible models for scans.</span>
+        <span>Load, iterate, and sample compatible models for scans.</span>
       </div>
     </div>
 
@@ -75,16 +70,16 @@
     <div class="sf-section-label">Downstream use</div>
     <div class="sf-row sf-row-3">
       <div class="sf-card sf-vault sf-compact">
-        <strong>Flux-vacua search</strong>
-        <span>Pass models to JAXVacua solvers and samplers.</span>
+        <strong>JAXVacua</strong>
+        <span>Flux-vacua physics, periods, sampling, and stability analysis.</span>
       </div>
       <div class="sf-card sf-vault sf-compact">
         <strong>VacuaWriter</strong>
-        <span>Store and designate vacuum solutions with model metadata.</span>
+        <span>Designated vacua with model identity and provenance.</span>
       </div>
       <div class="sf-card sf-vault sf-compact">
-        <strong>Cross-package pipelines</strong>
-        <span>Feed stabilisation and axion workflows from a common model source.</span>
+        <strong>Future consumers</strong>
+        <span>Kähler, axion, and optimisation workflows using the same data conventions.</span>
       </div>
     </div>
   </div>

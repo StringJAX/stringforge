@@ -1,67 +1,59 @@
 # Ecosystem overview
 
-**StringForge** is the umbrella framework for a family of JAX-based packages targeting
-string compactifications, Calabi–Yau geometry, and 4-D effective field theories.
-Each sibling package owns one layer of the compactification problem; this site
-documents the shared infrastructure that ties them together (catalog I/O, vacua
-storage, mirror-convention API) and provides cross-references into the per-package
-documentation.
+**StringForge** is the shared infrastructure layer for a family of JAX-based
+packages targeting string compactifications, Calabi-Yau geometry, and effective
+field theories.  It standardises the data and provenance boundary: catalogues,
+caches, model-loading bridges, vault layouts, and validation.
 
-## Sibling packages
+StringForge intentionally carries minimal physics.  Physics engines consume its
+data interfaces, but their computations live in their own packages.
+
+## Package status
 
 | Package | Role | Status | Reference |
 | --- | --- | --- | --- |
-| [`jaxvacua`](../packages/jaxvacua) | Type-IIB flux vacua: complex-structure sector, vacuum finding, stability analysis. | Public | [arXiv:2306.06160](https://arxiv.org/abs/2306.06160) |
-| [`jaxpolylog`](../packages/jaxpolylog) | JAX-compatible polylogarithm functions with autodiff support. | Public | — |
-| [`kahlerjax`](../packages/kahlerjax) | Kähler moduli stabilisation for 4-D N=1 EFTs. | Planned (public release pending) | [arXiv:2507.00615](https://arxiv.org/abs/2507.00615) |
-| [`jaxiverse`](../packages/jaxiverse) | Multi-axion EFT: spectra, decay constants, couplings from CY compactifications. | Planned (public release pending) | — |
-| [`cytools`](../packages/cytools) | Toric Calabi–Yau geometry library (external dependency). | Public | [arXiv:2211.03823](https://arxiv.org/abs/2211.03823) |
+| [`jaxvacua`](../packages/jaxvacua) | Type IIB flux vacua: complex-structure sector, vacuum finding, stability analysis. | Public | [arXiv:2306.06160](https://arxiv.org/abs/2306.06160) |
+| [`jaxpolylog`](../packages/jaxpolylog) &mdash; [GitHub](https://github.com/AndreasSchachner/jaxpolylog) &nbsp;[docs](https://jaxpolylog.readthedocs.io) | JAX-compatible polylogarithm functions with autodiff support. | Public | -- |
+| [`kahlerjax`](../packages/kahlerjax) | Planned Kähler-moduli stabilisation package. | Planned; API not stable | [arXiv:2507.00615](https://arxiv.org/abs/2507.00615) |
+| [`jaxiverse`](../packages/jaxiverse) | Planned multi-axion EFT package. | Planned; API not stable | -- |
+| [`cytools`](../packages/cytools) | External toric Calabi-Yau geometry library. | Public external dependency | [arXiv:2211.03823](https://arxiv.org/abs/2211.03823) |
+
+```{important}
+KahlerJAX and JAXiverse are shown to explain the intended ecosystem boundary.
+They are not installed by StringForge, are not imported by StringForge, and their
+public APIs should be treated as provisional until their own releases.
+```
 
 ## Ecosystem flow
 
-The figure below shows the practical boundary between StringForge and the
-sibling packages. StringForge owns shared data movement and validation; the
-physics packages own their package-specific calculations.
+The figure below shows the practical boundary between StringForge and sibling
+packages.  StringForge owns shared data movement and validation; the physics
+packages own their package-specific calculations.
 
 ```{eval-rst}
 .. raw:: html
    :file: ../_static/figures/f1_ecosystem_architecture.html
 ```
 
-For a finer-grained breakdown of who owns what and who consumes what,
-see [the architecture page](architecture).
-
 ## Where to read what
 
-| If you want… | Look here |
+| If you want... | Look here |
 | --- | --- |
-| Physics intros (CY geometries, periods, flux compactifications, moduli stabilisation, perturbatively flat vacua, supergravity). | The `Introduction` chapters in the [JAXVacua docs](https://jaxvacua.readthedocs.io/en/latest/) (linked via intersphinx — physics background is not duplicated here). |
-| Database & vacua-vault tooling (catalog queries, model loading, designation, HuggingFace push). | [Database interface](../tutorials/database_and_infrastructure/database_interface), [Vacua storage](../tutorials/database_and_infrastructure/vacua_storage), [Vault workflow](../tutorials/vault_workflow) on this site. |
-| Flux vacuum search, ISD sampling, flux bounding. | The `Vacuum Finding` and `Flux Bounding` chapters in the JAXVacua docs. |
-| Kähler moduli stabilisation. | The KahlerJAX docs (link will appear here once public). |
-| Axion physics. | The JAXiverse docs (link will appear here once public). |
-| End-to-end multi-package pipeline (CY → flux vacua → Kähler stabilisation → axion spectrum). | [Ecosystem pipeline](../tutorials/ecosystem_pipeline) on this site. |
-| Package boundaries and database conventions. | [Architecture](architecture), including the `lcs_tree` data bus and the catalog / mirror convention boundary. |
+| Database queries, cache/offline behaviour, and HuggingFace layout. | [Calabi-Yau Geometry Database](../intro/database). |
+| Loading JAXVacua models from database rows. | [Getting started](../getting_started) and [Database interface](../tutorials/database_and_infrastructure/database_interface). |
+| Vacuum-solution storage, designation, validation, and vault publication. | [Vault workflow](../tutorials/vault_workflow), [Vacua storage](../tutorials/database_and_infrastructure/vacua_storage), and [`stringforge.vacuavault`](../api/stringforge.vacuavault). |
+| Flux vacuum search, ISD sampling, flux bounding, periods, and mass spectra. | The [JAXVacua documentation](https://jaxvacua.readthedocs.io/en/latest/). |
+| Advanced KKLT-style curated index and tagging. | [KKLT Database](../intro/kklt_database). |
+| Planned Kähler or axion packages. | The planning pages, with the caveat that these are not first-release APIs. |
+
+## Future optimisation tooling
+
+PFV/fan-roots style optimisation packages are natural future consumers of the
+StringForge data and vault conventions.  They are not public release components
+and no install links are provided here yet.
 
 ## Citing the framework
 
-If you use any part of the StringForge ecosystem in your research, cite the
-framework paper:
-
-```bibtex
-@article{Dubey:2023dvu,
-    author        = "Dubey, Abhishek and Krippendorf, Sven and Schachner, Andreas",
-    title         = "{JAXVacua --- a framework for sampling string vacua}",
-    eprint        = "2306.06160",
-    archivePrefix = "arXiv",
-    primaryClass  = "hep-th",
-    doi           = "10.1007/JHEP12(2023)146",
-    journal       = "JHEP",
-    volume        = "12",
-    pages         = "146",
-    year          = "2023"
-}
-```
-
-Per-package citations (KahlerJAX, JAXiverse, …) are listed on each package's
-overview page once the package is public.
+Cite the package release together with the package-specific physics/software
+papers relevant to your workflow.  For flux-vacuum calculations, cite the
+JAXVacua paper in addition to StringForge.

@@ -16,107 +16,68 @@
 # along with StringForge. If not, see <https://www.gnu.org/licenses/>.
 
 """
-StringForge: Differentiable tools for string compactifications with JAX.
+StringForge: shared infrastructure for string-compactification workflows.
 
-An umbrella framework providing a unified computational pipeline from
-Calabi-Yau compactification data to four-dimensional effective field
-theories, vacuum solutions, and physical observables.
+StringForge provides reproducible access to Calabi-Yau database rows, cache and
+offline workflows, model-loading bridges into physics engines such as JAXVacua,
+and persistent vacua-vault infrastructure with provenance.  It is deliberately
+solver-light: flux-vacuum physics lives in JAXVacua, differentiable
+polylogarithms live in JAXPolyLog, and planned packages such as KahlerJAX and
+JAXiverse will consume the same conventions when they are public.
 
-Public submodules:
-    jaxvacua   - Type IIB flux vacua (complex-structure + axio-dilaton sector)
-    jaxpolylog - JAX-compatible polylogarithm functions
+Common workflows
+----------------
 
-Optional (private, install separately):
-    kahlerjax  - Kahler moduli stabilisation
-    jaxiverse  - Multi-axion EFT from string compactifications
-
-────────────────────────────────────────────────────────────────────────
-Common workflows — which class do I want?
-────────────────────────────────────────────────────────────────────────
-
-* **Query the on-disk catalog** (no model construction, no jaxvacua) —
-  :class:`stringforge.cy_io.CYDatabase` (or its dataset-specific
-  subclasses :class:`stringforge.cy_io.TDFDatabase` /
-  :class:`stringforge.cy_io.CICYDatabase`)::
+* Query TDF/CICY catalogues without constructing physics models::
 
       from stringforge import TDFDatabase
-      db   = TDFDatabase()                  # downloads catalog on first use
-      cats = db.query(h11=3, has_conifolds=True)
+      db = TDFDatabase()
+      rows = db.query(h11=3, has_conifolds=True)
 
-  All catalog columns and queries on this layer use the **catalog
-  convention** (small ``h11``, large ``h12``).
+  This pure-I/O layer uses the catalogue convention.
 
-* **Load a TDF / CICY model as a jaxvacua object** —
-  :class:`stringforge.lcs_database.LCSDatabase`::
-
-      from stringforge import LCSDatabase
-      db    = LCSDatabase(dataset="tdf")
-      model = db.load_model(ks_id=12345, triang_id=0, include_gv=True)
-
-  The ``LCSDatabase`` layer presents h11 / h12 in **mirror convention**
-  (jaxvacua / lcs_tree convention) — see the docstring on
-  :meth:`LCSDatabase.load` for the boundary-swap detail.
-
-* **Work with the curated KKLT-vacua subset** (conifold-class indexed,
-  cluster-run tracking, separate GV split) —
-  :class:`stringforge.kklt_database.KKLTDatabase`::
-
-      from stringforge import KKLTDatabase
-      db    = KKLTDatabase.from_local(".", tdf_cache_dir="./cy-database/")
-      model = db.load_model(h11=11, ks_id=384564,
-                            coni_class_id=0, coni_id=75,
-                            include_gv=True, gv_source="kklt")
-
-  KKLT methods use **mirror convention** for h11/h12 (large ``h11``,
-  small ``h12``) — the same convention as :class:`LCSDatabase`.  The
-  on-disk KKLT catalogs use the *catalog* convention; the swap happens
-  at the API boundary.  ``ks_id`` is only unique within a fixed
-  ``(h11, h12)``, so ``h11`` is required; pass ``h12=`` too only when
-  the resolver tells you the lookup is ambiguous.
-
-* **Save vacuum solutions to a permanent vault** (designated solutions,
-  HF Hub push/fetch) —
-  :class:`stringforge.vacua_writer.VacuaWriter`::
+* Load catalogue rows as JAXVacua-compatible objects::
 
       from stringforge import LCSDatabase
       db = LCSDatabase(dataset="tdf")
-      with db.vacua_writer(model=model) as writer:
-          for result in newton_search_results:
-              writer.append(result, tags=["benchmark"])
-      # Query the run-tagged rows back, then designate them.
-      df = db.query_vacua(run_id=writer.run_id)
-      db.designate_vacua(df, label="my_run", committed_by="A. Schachner")
-      db.push_vacua_to_hub()                # publish to HF Hub
+      model = db.load_model(ks_id=12345, triang_id=0, h11=128, h12=2)
 
-* **Validate vault parquet files / rebuild the catalog** —
-  :mod:`stringforge.vacuavault`
-  (``python -m stringforge.vacuavault validate ...``).
+  The LCS layer presents Hodge numbers in the mirror convention used by
+  ``jaxvacua.lcs.lcs_tree``.
 
-* **Inspect raw KKLT parquet rows without jaxvacua** —
-  :meth:`KKLTDatabase.load_dataframes` returns ``pandas.Series`` /
-  ``pandas.DataFrame`` objects for tabular workflows.
+* Work with the advanced curated KKLT index::
 
-────────────────────────────────────────────────────────────────────────
-Caching, offline mode, and the data dir
-────────────────────────────────────────────────────────────────────────
+      from stringforge import KKLTDatabase
+      db = KKLTDatabase()
+      classes = db.query_classes(ks_id=384564)
 
-Catalogs and parquet shards are downloaded **lazily on first use** and
-cached under ``stringforge.data_dir`` (default ``./.stringforge_cache``;
-override with the ``STRINGFORGE_DATA_DIR`` env var or
-:func:`set_data_dir`).  Vacuum solutions live in a separate
-``vacua_vault/`` directory (override with ``STRINGFORGE_VAULT`` /
-:func:`set_vault_dir`) so :meth:`CYDatabase.clear_cache` never wipes
-them.
+  The ``kklt`` dataset stores conifold-class indices, logical TDF links, and
+  curation tags.  Actual KKLT vacuum records belong in the shared vault.  This
+  is an expert workflow, not the default entry point.
 
-Pass ``offline=True`` to any database constructor (or use
-:meth:`CYDatabase.from_local`) to disable network access — every
-``_fetch_shard`` call then raises if its file isn't already cached.
+* Store or curate vacuum solutions with provenance::
+
+      from stringforge import LCSDatabase, set_vault_dir
+      set_vault_dir("./vacua_vault")
+      db = LCSDatabase(dataset="tdf")
+      # db.designate_vacua(vacua_df, model=model, label="scan")
+
+Caching and offline mode
+------------------------
+
+Catalogues and parquet shards are downloaded lazily and cached under
+``stringforge.data_dir`` (default ``./.stringforge_cache``; override via
+``STRINGFORGE_DATA_DIR`` or :func:`set_data_dir`).  Permanent designated vacua
+live in a separate ``vacua_vault/`` directory (override via
+``STRINGFORGE_VAULT`` or :func:`set_vault_dir`) so cache cleanup does not delete
+curated results.  Pass ``offline=True`` to a database constructor, or use
+``from_local(...)``, to disable network access.
 """
 
 __version__ = "0.1.0"
 
 # ── Data directory ────────────────────────────────────────────────────────
-# Default location for all database cache and vacua storage.  Override
+# Default location for database cache files.  Override
 # with ``STRINGFORGE_DATA_DIR`` env var or :func:`set_data_dir`.  The
 # ``cy_io`` layer reads this global at import time via
 # ``from . import data_dir`` so it must be defined before cy_io's
@@ -155,7 +116,7 @@ def set_data_dir(path):
 #      :func:`set_vault_dir`.
 #   2. ``<repo_root>/vacua_vault/`` when cwd is inside a stringforge
 #      source checkout.
-#   3. ``<cwd>/vacua_vault/`` otherwise.
+#   3. no fallback; an explicit path is required outside a source checkout.
 # The vault lives outside the cache dir so ``clear_cache()`` never wipes
 # designated solutions.
 
@@ -169,7 +130,7 @@ def set_vault_dir(path):
     Args:
         path (str | Path | None): Absolute or relative path to the
             vault directory.  Pass ``None`` to clear the override and
-            fall back to repo-root / cwd auto-detection.
+            fall back to repo-root detection, or raise if no source checkout is found.
 
     Returns:
         None
@@ -201,11 +162,145 @@ def set_vault_repo(repo_id):
         _os.environ["STRINGFORGE_VAULT_REPO"] = str(repo_id)
 # ──────────────────────────────────────────────────────────────────────────
 
+
+# ── Vulcan production-pipeline configuration ─────────────────────────────
+# Vulcan owns the *production* / cluster-side / ML-friendly vacuum repo,
+# complementary to the curated ``vacua_vault`` repo above.  Workers stage
+# parquet shards in a local staging directory and a separate sync tier
+# batches them into HuggingFace commits, respecting HF's 100-commits-
+# per-hour cap.  See ``stringforge.vulcan`` for the full API.
+
+def set_vulcan_repo(repo_id):
+    r"""
+    **Description:**
+    Set the HuggingFace dataset repo ID used by Vulcan for production
+    vacuum uploads.  Sets the ``STRINGFORGE_VULCAN_REPO`` env var.
+
+    Args:
+        repo_id (str | None): ``"user/repo"`` on HuggingFace Hub, or
+            ``None`` to clear the override.  Vulcan has no implicit
+            default repo — each ``Vulcan(repo=...)`` instance must
+            be told where to write.
+
+    Returns:
+        None
+    """
+    if repo_id is None:
+        _os.environ.pop("STRINGFORGE_VULCAN_REPO", None)
+    else:
+        _os.environ["STRINGFORGE_VULCAN_REPO"] = str(repo_id)
+
+
+def set_vulcan_staging_dir(path):
+    r"""
+    **Description:**
+    Set the local staging directory used by Vulcan workers for pending
+    shards awaiting sync.  Sets the ``STRINGFORGE_VULCAN_STAGING_DIR``
+    env var.
+
+    Args:
+        path (str | Path | None): Absolute or relative path.  Pass
+            ``None`` to clear the override and fall back to
+            ``<repo_root>/vulcan_staging/`` or
+            ``<data_dir>/vulcan_staging/``.
+
+    Returns:
+        None
+    """
+    if path is None:
+        _os.environ.pop("STRINGFORGE_VULCAN_STAGING_DIR", None)
+    else:
+        _os.environ["STRINGFORGE_VULCAN_STAGING_DIR"] = str(path)
+
+
+def set_vulcan_project(project):
+    r"""
+    **Description:**
+    Set the default ``{project}`` substitution for the Vulcan
+    run-id template.  Sets the ``STRINGFORGE_VULCAN_PROJECT`` env var.
+
+    Args:
+        project (str | None): Project tag.  Pass ``None`` to clear.
+
+    Returns:
+        None
+    """
+    if project is None:
+        _os.environ.pop("STRINGFORGE_VULCAN_PROJECT", None)
+    else:
+        _os.environ["STRINGFORGE_VULCAN_PROJECT"] = str(project)
+
+
+def set_vulcan_token(token):
+    r"""
+    **Description:**
+    Set the HuggingFace access token used by Vulcan's sync tier.  Sets
+    the ``STRINGFORGE_VULCAN_TOKEN`` env var.
+
+    Args:
+        token (str | None): HuggingFace access token.  Pass ``None`` to
+            clear the override.
+
+    Returns:
+        None
+    """
+    if token is None:
+        _os.environ.pop("STRINGFORGE_VULCAN_TOKEN", None)
+    else:
+        _os.environ["STRINGFORGE_VULCAN_TOKEN"] = str(token)
+
+
+def set_vulcan_budget(budget):
+    r"""
+    **Description:**
+    Set the commits-per-hour ceiling honoured by Vulcan's sync tier.
+    Sets the ``STRINGFORGE_VULCAN_BUDGET`` env var.  The hard
+    HuggingFace cap is 100/hour; defaults to 90 to leave a safety
+    margin.
+
+    Args:
+        budget (int | None): Commits/hour.  Pass ``None`` to clear.
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: If ``budget`` is negative.
+    """
+    if budget is None:
+        _os.environ.pop("STRINGFORGE_VULCAN_BUDGET", None)
+    else:
+        budget_int = int(budget)
+        if budget_int < 0:
+            raise ValueError(
+                f"Vulcan budget must be non-negative, got {budget_int}."
+            )
+        from .vulcan.ratelimit import HF_COMMITS_PER_HOUR_CAP
+        if budget_int > HF_COMMITS_PER_HOUR_CAP:
+            import warnings as _warnings
+            _warnings.warn(
+                f"Vulcan budget {budget_int} exceeds the HuggingFace "
+                f"commits-per-hour cap of {HF_COMMITS_PER_HOUR_CAP}; "
+                "uploads above the cap will be throttled or rejected.",
+                stacklevel=2,
+            )
+        _os.environ["STRINGFORGE_VULCAN_BUDGET"] = str(budget_int)
+# ──────────────────────────────────────────────────────────────────────────
+
 from .cy_io import *
 from .lcs_database import *
 from .kklt_database import *
 from .vacua_writer import *
 from .vacuavault import *
+from .vulcan import (
+    FeatureSpec,
+    StagedShard,
+    SyncReport,
+    Vulcan,
+    VulcanMLView,
+    VulcanReader,
+    resolve_staging_dir,
+)
 
 # Optional ecosystem packages are intentionally not imported here.  Keeping the
 # package import lightweight avoids solver-library side effects and lets users

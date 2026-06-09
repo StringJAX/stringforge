@@ -4,10 +4,10 @@ from stringforge.lcs_database import LCSDatabase
 
 
 def test_kklt_dataset_dispatch_accepts_positional_dataset(tmp_path):
-    db = LCSDatabase("kklt_vacua", cache_dir=str(tmp_path), offline=True)
+    db = LCSDatabase("kklt", cache_dir=str(tmp_path), offline=True)
 
     assert type(db).__name__ == "KKLTDatabase"
-    assert db.dataset == "kklt_vacua"
+    assert db.dataset == "kklt"
     assert hasattr(db, "_tdf_seed")
 
 

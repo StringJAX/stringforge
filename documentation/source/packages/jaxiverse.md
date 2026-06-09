@@ -1,41 +1,35 @@
 # JAXiverse
 
-```{admonition} Planned
-:class: note
-JAXiverse is under development and will be released publicly in a future
-version of StringForge. This page is a placeholder for the package's public
-overview.
+```{admonition} Planned package; API not stable
+:class: warning
+JAXiverse is not part of the first public StringForge release.  This page
+records the intended ecosystem boundary only.  StringForge does not install,
+import, or guarantee any JAXiverse API in this release.
 ```
 
-**Multi-axion effective field theory: spectra, decay constants, and couplings
-from Calabi–Yau compactifications.**
+**Planned role:** multi-axion effective field theory from string compactification
+data.
 
-JAXiverse provides a framework-agnostic solver for multi-axion EFTs arising from
-string compactifications. Given the inverse kinetic matrix, the charge matrix,
-and the instanton scales of an N-axion system, it computes masses, decay
-constants, mixing matrices, and quartic self-couplings — using a choice of
-numerical strategies that range from fast hierarchical approximations to
-arbitrary-precision backends.
+JAXiverse is intended to consume stabilised geometric/EFT data and compute axion
+spectra, decay constants, mixing matrices, and couplings.  StringForge will
+provide shared data conventions and persistence, not the axion solver itself.
 
-## Status
+## Planned ownership
 
-Planned (public release pending).
+- Multi-axion EFT objects and numerical strategies.
+- Axion spectra, decay constants, kinetic mixing, and couplings.
+- Bridges from future Kähler-sector data to axion observables.
 
-## What it owns (planned surface)
+## Current release status
 
-- **`jaxiverse.axions.jaxion`** — multi-axion EFT, extends
-  `kahlerjax.kahler_sector_N2.kahler_sector`. Computes the spectrum, decay
-  constants and couplings.
-- **`cytools.calabiyau.CalabiYau.jaxion`** — convenience method monkey-patched
-  at import time so end users can write `cy.jaxion(...)` rather than
-  constructing the EFT by hand.
+- Not a StringForge dependency.
+- Not imported by `stringforge`.
+- No install command or executable tutorial cells are provided until public
+  release.
+- Public documentation will be linked once the package is released.
 
-## What it consumes
+## Related packages
 
-- [`cytools`](cytools) — `CalabiYau` for the geometric input.
-- [`kahlerjax`](kahlerjax) — `kahler_sector` (subclass relationship).
-- [`jaxpolylog`](jaxpolylog) — transitively, via `kahlerjax`.
-
-## Links
-
-- **Source / docs:** to be populated when public.
+- [`cytools`](cytools) for geometric input.
+- [`kahlerjax`](kahlerjax) as a planned upstream Kähler-sector package.
+- [`jaxpolylog`](jaxpolylog) transitively through physics-sector packages.

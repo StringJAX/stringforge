@@ -25,6 +25,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 *twoface_ineqs
+vacua_vault/
 documentation/build/
 documentation/source/_autosummary/
 documentation/.DS_Store
@@ -33,7 +34,7 @@ private/
 *.DS_Store
 *DS_Store
 *.claude
-NEWWWWW/
+notes/
 
 MANIFEST
 

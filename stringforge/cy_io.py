@@ -151,7 +151,7 @@ def _resolve_vault_dir() -> Path:
 _DATASET_CONFIGS: Dict[str, str] = {
     "tdf":        "KS",
     "cicy":       "CICY",
-    "kklt_vacua": "KKLT",
+    "kklt":       "KKLT",
 }
 
 SCHEMA_VERSION: int = 1
@@ -160,14 +160,14 @@ SCHEMA_CHANGELOG: Dict[int, str] = {
     1: "Initial versioned schema. Conifold basis-change matrix stored as "
        "'basis_change' column; 'n_conifolds' and 'D3_tadpole' added to "
        "catalog.parquet; conifold_catalog.parquet introduced.  "
-       "The 'kklt_vacua' sub-dataset adopts v1 with an extended catalog "
+       "The 'kklt' sub-dataset adopts v1 with an extended catalog "
        "layout: polytope-grain catalog.parquet (one row per ks_id) with "
        "n_rigids_dual / Q / n_coni_classes; conifold_class_catalog.parquet "
        "keyed by (ks_id, coni_class_id); conifold_catalog.parquet keyed by "
        "(ks_id, coni_class_id, coni_id) carrying the logical TDF link "
-       "(triang_id, tdf_conifold_id); run_log.parquet for cluster-run "
-       "tracking; schema.json carries a TDF-compat fingerprint "
-       "(tdf_schema_version, tdf_catalog_sha256).",
+       "(triang_id, tdf_conifold_id); optional tag columns record "
+       "curation and release-readiness metadata; schema.json carries a "
+       "TDF-compat fingerprint (tdf_schema_version, tdf_catalog_sha256).",
 }
 
 class SchemaVersionError(RuntimeError):
@@ -431,41 +431,30 @@ class _LRUShardCache:
 class CYDatabase:
     r"""
     **Description:**
-    Interface for loading Calabi-Yau geometry data from a HuggingFace dataset
-    repository.
+    Pure-I/O interface for Calabi-Yau geometry data stored in the
+    HuggingFace-hosted ``cy-database``.
 
-    The database is organised into sub-datasets (``dataset`` parameter).
-    Currently supported:
+    The database is organised into sub-datasets (``dataset`` parameter):
 
     - ``"tdf"``: toric models from the Kreuzer-Skarke list, identified by
-      ``(ks_id, triang_id)``.
+      ``(ks_id, triang_id)`` in catalogue convention.
     - ``"cicy"``: Complete Intersection Calabi-Yau models, identified by
       ``cicy_id``.
+    - ``"kklt"``: curated KKLT search index with logical links back to TDF.
 
-    A lightweight catalog is downloaded once and kept in memory.  Geometry
-    data (``lcs_data`` split), GV invariants, conifold data, and additional
-    model properties (``extra`` split) are fetched on demand and cached
-    locally.
+    ``CYDatabase`` downloads catalogues and parquet shards lazily, caches them
+    locally, supports offline operation, and exposes tabular query helpers.  It
+    intentionally has no JAXVacua dependency and does not construct
+    ``lcs_tree`` or ``FluxVacuaFinder`` objects.  Use
+    :class:`stringforge.lcs_database.LCSDatabase` for that model-loading bridge.
 
     Example usage::
 
         db = CYDatabase(dataset="tdf")
-        db.info()
+        rows = db.query(h11=2, has_conifolds=True)
+        poly = db.get_polytope(ks_id=int(rows.iloc[0]["ks_id"]), h11=2)
 
-        # Browse available models
-        df = db.query(h11=2, h12=128)
-
-        # Load a single model as an lcs_tree
-        tree = db.load(ks_id=12345, triang_id=0)
-        tree = db.load(ks_id=12345, triang_id=0, include_gv=True, maximum_degree=5)
-        tree = db.load(ks_id=12345, triang_id=0, include_conifolds=True)
-
-        # Load directly as a FluxVacuaFinder model
-        model = db.load_model(ks_id=12345, triang_id=0, Q=24)
-
-        # Batch and random sampling
-        trees = db.load_batch(df.head(20))
-        trees = db.sample(h11=2, n=10, seed=42)
+        offline_db = CYDatabase.from_local("./.stringforge_cache", dataset="tdf")
 
     """
 
@@ -489,8 +478,9 @@ class CYDatabase:
 
         Args:
             dataset (str): Sub-dataset identifier.  Must be one of
-                ``"tdf"`` (Kreuzer-Skarke toric models) or ``"cicy"``
-                (Complete Intersection CY models).  Defaults to ``"tdf"``.
+                ``"tdf"`` (Kreuzer-Skarke toric models), ``"cicy"``
+                (Complete Intersection CY models), or ``"kklt"``
+                (curated KKLT index).  Defaults to ``"tdf"``.
             hf_repo (str): HuggingFace repository identifier of the form
                 ``"org/repo-name"``.  Defaults to :data:`HF_REPO_ID`.
             cache_dir (str | None): Local directory for cached parquet
@@ -579,7 +569,8 @@ class CYDatabase:
 
         Args:
             path (str | Path): Root directory of the local database.
-            dataset (str): Sub-dataset identifier (``"tdf"`` or ``"cicy"``).
+            dataset (str): Sub-dataset identifier (``"tdf"``, ``"cicy"``,
+                or ``"kklt"``).
             shard_cache_size (int): In-memory shard cache size.
 
         Returns:
@@ -1559,12 +1550,13 @@ class TDFDatabase(CYDatabase):
     Convenience subclass of :class:`CYDatabase` pre-configured for the
     ``"tdf"`` sub-dataset (toric models from the Kreuzer-Skarke list).
 
-    Models are identified by ``(ks_id, triang_id)``.
+    Models are identified by ``(ks_id, triang_id)`` in catalogue convention.
 
     Example usage::
 
         db = TDFDatabase()
-        tree = db.load(ks_id=12345, triang_id=0)
+        rows = db.query(h11=2, has_conifolds=True)
+        poly = db.get_polytope(ks_id=int(rows.iloc[0]["ks_id"]), h11=2)
     """
 
     # Consumed by :meth:`CYDatabase.from_local` so that
@@ -1607,12 +1599,12 @@ class CICYDatabase(CYDatabase):
     Convenience subclass of :class:`CYDatabase` pre-configured for the
     ``"cicy"`` sub-dataset (Complete Intersection Calabi-Yau models).
 
-    Models are identified by ``cicy_id``.
+    Models are identified by ``cicy_id`` in catalogue convention.
 
     Example usage::
 
         db = CICYDatabase()
-        tree = db.load(cicy_id=7890)
+        rows = db.query(h11=1)
     """
 
     # Consumed by :meth:`CYDatabase.from_local` so that

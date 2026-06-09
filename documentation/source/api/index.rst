@@ -1,61 +1,49 @@
 API reference
 =============
 
-The public API of `stringforge` is organised into five modules. All five are
-auto-documented from their docstrings; click through for the full signatures
-and per-method descriptions.
-
-.. autosummary::
-   :nosignatures:
-
-   stringforge.cy_io
-   stringforge.lcs_database
-   stringforge.kklt_database
-   stringforge.vacua_writer
-   stringforge.vacuavault
-
-Module index
-------------
+The public API of ``stringforge`` is organised around infrastructure workflows:
+query data, load models, persist vacua, and validate vault submissions.  Physics
+calculations live in sibling packages such as JAXVacua.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :hidden:
 
    stringforge.cy_io
    stringforge.lcs_database
    stringforge.kklt_database
    stringforge.vacua_writer
    stringforge.vacuavault
+   stringforge.vulcan
 
-Quick reference
----------------
+Workflow entry points
+---------------------
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 70
+   :widths: 36 64
 
-   * - Task
-     - Entry point
-   * - Filter the cy-database catalog (catalog convention).
-     - :class:`stringforge.cy_io.CYDatabase` — :meth:`~stringforge.cy_io.CYDatabase.query`,
-       :meth:`~stringforge.cy_io.CYDatabase.query_conifolds`, :meth:`~stringforge.cy_io.CYDatabase.info`.
-   * - Build a model in mirror convention (load → ``lcs_tree``, ``FluxVacuaFinder``).
-     - :class:`stringforge.lcs_database.LCSDatabase` — :meth:`~stringforge.lcs_database.LCSDatabase.load`,
-       :meth:`~stringforge.lcs_database.LCSDatabase.load_model`, :meth:`~stringforge.lcs_database.LCSDatabase.load_batch`,
-       :meth:`~stringforge.lcs_database.LCSDatabase.iter_batch`, :meth:`~stringforge.lcs_database.LCSDatabase.sample`.
-   * - Work with the curated KKLT-vacua subset (indexed by conifold class) and track cluster runs.
-     - :class:`stringforge.kklt_database.KKLTDatabase` — :meth:`~stringforge.kklt_database.KKLTDatabase.query_polytopes`,
-       :meth:`~stringforge.kklt_database.KKLTDatabase.query_classes`,
-       :meth:`~stringforge.kklt_database.KKLTDatabase.query_conifolds`,
-       :meth:`~stringforge.kklt_database.KKLTDatabase.load_model`,
-       :meth:`~stringforge.kklt_database.KKLTDatabase.start_run`,
-       :meth:`~stringforge.kklt_database.KKLTDatabase.finish_run`,
-       :meth:`~stringforge.kklt_database.KKLTDatabase.rebuild_links`.
-   * - Write vacuum solutions to the local vault, designate, push to HuggingFace.
+   * - Goal
+     - Start here
+   * - Query TDF/CICY catalogues without constructing physics models.
+     - :class:`stringforge.cy_io.CYDatabase`, :class:`stringforge.cy_io.TDFDatabase`, :class:`stringforge.cy_io.CICYDatabase`.
+   * - Load catalogue rows as JAXVacua-compatible data or models.
+     - :class:`stringforge.lcs_database.LCSDatabase` — :meth:`~stringforge.lcs_database.LCSDatabase.load`, :meth:`~stringforge.lcs_database.LCSDatabase.load_model`, :meth:`~stringforge.lcs_database.LCSDatabase.load_batch`, :meth:`~stringforge.lcs_database.LCSDatabase.iter_batch`, :meth:`~stringforge.lcs_database.LCSDatabase.sample`.
+   * - Work with the advanced KKLT index.
+     - :class:`stringforge.kklt_database.KKLTDatabase` — conifold-class queries, logical TDF links, model loading, and curation tags.
+   * - Store, designate, retract, or fetch vacuum solutions.
      - :class:`stringforge.vacua_writer.VacuaWriter`.
-   * - Validate vault parquets, rebuild the catalog, curate community submissions.
-     - :mod:`stringforge.vacuavault` — :func:`~stringforge.vacuavault.validate_parquet_file`,
-       :func:`~stringforge.vacuavault.rebuild_catalog`, :func:`~stringforge.vacuavault.curate_submission`.
+   * - Validate vault parquet files and rebuild vault catalogues.
+     - :mod:`stringforge.vacuavault`.
+   * - Forge cluster-side production vacuum runs into a HuggingFace repo.
+     - :class:`stringforge.vulcan.Vulcan`, :class:`stringforge.vulcan.VulcanReader`, :class:`stringforge.vulcan.VulcanMLView`.
 
-For the conventions that govern the boundary between catalog and mirror
-representations, and the inter-module data-flow contract, see
-:doc:`../ecosystem/architecture`.
+Module pages
+------------
+
+* :doc:`stringforge.cy_io`
+* :doc:`stringforge.lcs_database`
+* :doc:`stringforge.kklt_database`
+* :doc:`stringforge.vacua_writer`
+* :doc:`stringforge.vacuavault`
+* :doc:`stringforge.vulcan`

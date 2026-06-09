@@ -20,10 +20,11 @@ External public dependency.
   `cytools.Cone` are imported by `jaxvacua.conifold`, `jaxvacua.cytools_interface`.
   The `cytools_interface` module translates a `cytools.CalabiYau` object into
   the inputs needed for `lcs_tree.from_cytools`.
-- **`kahlerjax`** — heavy user of toric helpers (`Polytope`, `Triangulation`,
-  `CalabiYau`) for divisor / orientifold computations.
-- **`jaxiverse`** — uses `cytools.calabiyau.CalabiYau` and monkey-patches a
-  `.jaxion(...)` convenience method onto it.
+- **Planned Kähler-sector packages** — expected to consume toric helpers such
+  as `Polytope`, `Triangulation`, and `CalabiYau` once their public APIs are
+  released.
+- **Planned axion-sector packages** — expected to consume stabilised geometry
+  and effective-field-theory data through their own public interfaces.
 - **`stringforge`** — does not directly depend on cytools at runtime; the
   `LCSDatabase` and vacua-vault layers operate on already-loaded data.
 

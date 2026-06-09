@@ -1,9 +1,8 @@
 Tutorials
 =========
 
-This page collects the executable notebooks in one place.  Use it as the
-main entry point once you want to run code rather than read background
-material.
+This page collects the executable notebooks in one place.  Use it as the main
+entry point once you want to run code rather than read background material.
 
 Choosing a path
 ---------------
@@ -15,29 +14,35 @@ Choosing a path
       :link: tutorials/quickstart
       :link-type: doc
 
-      Start here for the broadest overview of how StringForge relates to
-      the sibling packages in the ecosystem.
+      Query a catalogue, load a model as ``lcs_tree``, construct a JAXVacua
+      ``FluxVacuaFinder``, and learn where StringForge stops.
 
    .. grid-item-card:: Database access
       :link: tutorials/database_and_infrastructure/database_interface
       :link-type: doc
 
-      Query the HuggingFace-hosted catalogues, load Calabi-Yau data, and
-      construct JAXVacua models through ``LCSDatabase``.
+      Query HuggingFace-hosted catalogues, load Calabi-Yau data, batch models,
+      and manage cache/offline workflows.
 
    .. grid-item-card:: Vacua storage
       :link: tutorials/vault_workflow
       :link-type: doc
 
-      Learn how designated vacua are validated, stored locally, and prepared
-      for the public vacua vault.
+      Validate, designate, store, and prepare vacuum datasets for the shared
+      ``vacua_vault``.
 
    .. grid-item-card:: Cluster workflows
       :link: tutorials/database_and_infrastructure/cluster_parallelisation
       :link-type: doc
 
-      Use the infrastructure notebooks when a scan needs chunking, merging,
-      and persistent run output.
+      Older chunk-and-merge pattern; prefer Vulcan for new cluster runs.
+
+   .. grid-item-card:: Production cluster runs
+      :link: tutorials/database_and_infrastructure/vulcan_cluster_runs
+      :link-type: doc
+
+      Stage vacuum batches on workers, batch-commit on a head node within
+      HuggingFace's commit-rate cap, query and stream the resulting dataset.
 
 Tutorial catalogue
 ------------------
@@ -52,9 +57,9 @@ Quickstart and overview
    * - Notebook
      - Use it for
    * - :doc:`Quickstart <tutorials/quickstart>`
-     - A first orientation to the package and its relationship to JAXVacua.
+     - The shortest StringForge-first database-to-JAXVacua workflow.
    * - :doc:`StringForge ecosystem pipeline <tutorials/ecosystem_pipeline>`
-     - End-to-end package choreography across the broader ecosystem.
+     - Public package choreography plus schematic planning notes for future packages.
 
 Geometry input and databases
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,13 +71,11 @@ Geometry input and databases
    * - Notebook
      - Use it for
    * - :doc:`CYTools interface <tutorials/cytools_interface>`
-     - Loading Kreuzer-Skarke geometries through CYTools and translating
-       them into model data.
+     - Understanding the boundary between CYTools objects, database rows, and JAXVacua model data.
    * - :doc:`Complete Intersection Calabi-Yau Threefolds <tutorials/cicy>`
-     - Working with CICY data and CICY model loading.
+     - Working with CICY catalogue data, with provenance caveats.
    * - :doc:`Database interface <tutorials/database_and_infrastructure/database_interface>`
-     - Querying catalogues, loading individual models, batch loading,
-       offline mode, and cache management.
+     - Querying catalogues, loading individual models, batch loading, offline mode, and cache management.
 
 Vacua vault and infrastructure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -88,8 +91,21 @@ Vacua vault and infrastructure
    * - :doc:`Vacua storage <tutorials/database_and_infrastructure/vacua_storage>`
      - Local vacuum storage, querying, designation, retraction, and sharing.
    * - :doc:`Cluster parallelisation <tutorials/database_and_infrastructure/cluster_parallelisation>`
-     - Exporting scan chunks, processing them on a cluster, and merging
-       results back into the vault workflow.
+     - Exporting scan chunks, processing them on a cluster, and merging results.
+   * - :doc:`Vulcan cluster runs <tutorials/database_and_infrastructure/vulcan_cluster_runs>`
+     - Production vacuum forging: stage on workers, batch-commit on the head node, query and stream as an ML dataset.
+
+Advanced curated subsets
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Page
+     - Use it for
+   * - :doc:`KKLT Database <intro/kklt_database>`
+     - Specialised conifold-class indexing and tags for KKLT-style searches.
 
 .. toctree::
    :hidden:
@@ -102,4 +118,5 @@ Vacua vault and infrastructure
    tutorials/vault_workflow
    tutorials/database_and_infrastructure/vacua_storage
    tutorials/database_and_infrastructure/cluster_parallelisation
+   tutorials/database_and_infrastructure/vulcan_cluster_runs
    tutorials/ecosystem_pipeline

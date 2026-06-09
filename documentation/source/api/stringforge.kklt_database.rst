@@ -4,74 +4,52 @@ stringforge.kklt_database
 .. currentmodule:: stringforge.kklt_database
 
 .. automodule:: stringforge.kklt_database
+   :no-members:
 
+.. warning::
 
-Database class
------------------------------------
+   The KKLT interface is an advanced curated-subset workflow.  It is public API,
+   but most users should begin with ``TDFDatabase`` / ``CICYDatabase`` and the
+   general ``LCSDatabase`` model-loading bridge.
 
-Extends :class:`stringforge.lcs_database.LCSDatabase` with the
-``kklt_vacua`` sub-dataset — a curated subset of TDF indexed by
-conifold class.  Every row carries a *logical* TDF link
-``(ks_id, triang_id, tdf_conifold_id)``; physical shard coordinates
-are resolved on demand from the wrapped :attr:`tdf` database.
+Overview
+--------
+
+``KKLTDatabase`` exposes the ``kklt`` sub-dataset: a curated TDF search index
+inside the general ``cy-database`` repository.  It carries logical TDF links,
+optional KKLT-specific GV pointers, and scalar curation tags.  Actual
+designated KKLT vacua belong in the shared ``vacua_vault/kklt_vacua`` records.
 
 .. autosummary::
-    :toctree: ../_autosummary
-    :template: custom-class-template.rst
+   :toctree: ../_autosummary
+   :template: custom-class-template.rst
 
-    KKLTDatabase
+   KKLTDatabase
 
+Curated method index
+--------------------
 
-Querying the catalogs
------------------------------------
+Catalogue and conifold-class queries:
 
-The KKLT database exposes three catalogs (polytope-grain,
-conifold-class, individual-conifold) plus an append-only run log.
-
-* :meth:`KKLTDatabase.query`
 * :meth:`KKLTDatabase.query_polytopes`
 * :meth:`KKLTDatabase.query_classes`
 * :meth:`KKLTDatabase.query_conifolds`
-* :meth:`KKLTDatabase.list_runs`
-* :meth:`KKLTDatabase.info`
+* :meth:`KKLTDatabase.load_dataframes`
 
-
-Loading models
------------------------------------
-
-Loaders take the KKLT key ``(ks_id, coni_class_id, coni_id)`` and
-delegate to the wrapped :attr:`KKLTDatabase.tdf` after resolving the
-logical TDF link.
+Model loading:
 
 * :meth:`KKLTDatabase.load`
 * :meth:`KKLTDatabase.load_model`
-* :meth:`KKLTDatabase.load_from_conifold_row`
+* :meth:`KKLTDatabase.from_local`
 
-
-Run-tracking (cluster provenance)
------------------------------------
-
-Append-only run log keyed by scope (``"class"`` or ``"conifold"``) +
-polytope / class / conifold IDs.  Concurrent local writers are
-serialised by an advisory ``flock``.
+Run provenance:
 
 * :meth:`KKLTDatabase.start_run`
 * :meth:`KKLTDatabase.finish_run`
-* :meth:`KKLTDatabase.cancel_run`
+* :meth:`KKLTDatabase.fail_run`
 * :meth:`KKLTDatabase.run_status`
-* :meth:`KKLTDatabase.push_run_log`
-* :meth:`KKLTDatabase.fetch_run_log`
 
+Constants
+---------
 
-TDF-link maintenance
------------------------------------
-
-* :meth:`KKLTDatabase.rebuild_links`
-
-
-Module-level constants and helpers
------------------------------------
-
-* :data:`DEFAULT_KKLT_HF_REPO`
-* :func:`_resolve_kklt_hf_repo`
-* :data:`_RUN_LOG_COLUMNS`
+.. autodata:: DEFAULT_KKLT_HF_REPO

@@ -8,7 +8,7 @@
 # :class:`~stringforge.lcs_database.LCSDatabase` (``dataset="tdf"``)
 # resolves physical shard coordinates on the fly.
 #
-# Three local catalogs (under ``<cache_dir>/kklt_vacua/``):
+# Three local catalogs (under ``<cache_dir>/kklt/``):
 #
 #   - ``catalog.parquet``                  (polytope-grain;
 #                                           one row per ks_id;
@@ -20,7 +20,9 @@
 #                                           (ks_id, coni_class_id, coni_id);
 #                                           carries (triang_id, tdf_conifold_id))
 #
-# Plus an append-only ``run_log.parquet`` for cluster-run provenance.
+# Optional local run logs and solution-stage fragments are run artefacts.  Public
+# designated vacua belong in the shared ``vacua_vault/kklt_vacua`` namespace,
+# not in the static ``cy-database/kklt`` index.
 #
 # Subset criterion (applied at build time): ``n_rigids_dual > h12``.
 # ``Q := h11 + h12 + 2`` is a column on ``catalog.parquet`` but not a
@@ -32,7 +34,6 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
-import os
 import socket
 import uuid
 import warnings
@@ -43,6 +44,7 @@ from typing import Any, Dict, Iterator, List, Optional, Union
 import numpy as np
 
 from .cy_io import (
+    HF_REPO_ID,
     _DATASET_CONFIGS,
     _require_pandas,
 )
@@ -79,6 +81,79 @@ def _kklt_conifold_dirname(coni_class_id: int, coni_id: int) -> str:
 def _utcnow() -> _dt.datetime:
     r"""Return the current UTC time as a ``datetime``."""
     return _dt.datetime.now(_dt.timezone.utc)
+
+
+def _normalise_tags_arg(tags: Optional[Union[str, List[str]]]) -> set:
+    r"""Normalise a tag filter argument to a set of strings."""
+    if tags is None:
+        return set()
+    if isinstance(tags, str):
+        return {tags}
+    return {str(tag) for tag in tags}
+
+
+def _tags_from_cell(value: Any) -> set:
+    r"""Return a set of tag labels from a scalar or list-like parquet cell."""
+    if value is None:
+        return set()
+    if hasattr(value, "tolist") and not isinstance(value, (str, bytes)):
+        value = value.tolist()
+    if isinstance(value, str):
+        raw = value.replace(";", ",").replace("|", ",").split(",")
+        return {item.strip() for item in raw if item.strip()}
+    if isinstance(value, (list, tuple, set)):
+        return {
+            str(item).strip()
+            for item in value
+            if item is not None and str(item).strip()
+        }
+    try:
+        if bool(np.isnan(value)):
+            return set()
+    except (TypeError, ValueError):
+        pass
+    return {str(value).strip()} if str(value).strip() else set()
+
+
+def _apply_tag_filters(
+    frame: Any,
+    mask: Any,
+    *,
+    tags_include: Optional[Union[str, List[str]]] = None,
+    tags_exclude: Optional[Union[str, List[str]]] = None,
+    tag_column: str = "tags",
+    tag_mode: str = "all",
+) -> Any:
+    r"""Apply include/exclude tag filters to a boolean pandas/numpy mask."""
+    include = _normalise_tags_arg(tags_include)
+    exclude = _normalise_tags_arg(tags_exclude)
+    if not include and not exclude:
+        return mask
+    if tag_mode not in {"all", "any"}:
+        raise ValueError("tag_mode must be 'all' or 'any'.")
+    if tag_column not in frame.columns:
+        message = (
+            f"Tag column '{tag_column}' not found in KKLT catalog; "
+            "include-tag filter matched no rows."
+            if include
+            else
+            f"Tag column '{tag_column}' not found in KKLT catalog; "
+            "tag filter ignored."
+        )
+        warnings.warn(message, stacklevel=3)
+        if include:
+            return mask & np.zeros(len(frame), dtype=bool)
+        return mask
+
+    row_tags = frame[tag_column].map(_tags_from_cell)
+    if include:
+        if tag_mode == "all":
+            mask &= row_tags.map(lambda tags: include.issubset(tags)).values
+        else:
+            mask &= row_tags.map(lambda tags: bool(include & tags)).values
+    if exclude:
+        mask &= row_tags.map(lambda tags: exclude.isdisjoint(tags)).values
+    return mask
 
 
 @contextmanager
@@ -123,20 +198,24 @@ _RUN_LOG_COLUMNS = [
 # Module-level constants and env-var helpers
 # ----------------------------------------------------------------------------
 
-DEFAULT_KKLT_HF_REPO: str = "aschachner/kklt-vacua-database"
+DEFAULT_KKLT_HF_REPO: str = HF_REPO_ID
 
 
 def _resolve_kklt_hf_repo() -> str:
     r"""
     **Description:**
-    Return the HuggingFace dataset repo ID for the ``kklt_vacua``
-    sub-dataset.  Honours the ``STRINGFORGE_KKLT_HF_REPO`` environment
-    variable, falling back to :data:`DEFAULT_KKLT_HF_REPO`.
+    Return the HuggingFace dataset repo ID for the ``kklt`` sub-dataset.
+
+    KKLT index data now live inside the general-purpose
+    ``aschachner/cy-database`` repository.  This helper is kept for
+    compatibility with older code paths and therefore resolves to the
+    normal ``STRINGFORGE_HF_REPO`` value, not to a separate KKLT
+    repository.
 
     Returns:
         str: ``"user/repo"`` HF Hub identifier.
     """
-    return os.environ.get("STRINGFORGE_KKLT_HF_REPO", DEFAULT_KKLT_HF_REPO)
+    return DEFAULT_KKLT_HF_REPO
 
 
 # ----------------------------------------------------------------------------
@@ -147,9 +226,10 @@ def _resolve_kklt_hf_repo() -> str:
 class KKLTDatabase(LCSDatabase):
     r"""
     **Description:**
-    KKLT-vacua sub-dataset interface: a curated subset of
+    Advanced KKLT index interface: a curated subset of
     :class:`~stringforge.lcs_database.LCSDatabase` (``dataset="tdf"``).
 
+    This is specialised infrastructure for curated KKLT-style searches, not the default user entry point.
     The KKLT database does **not** duplicate Calabi-Yau geometry data.
     Every row in the local catalogs carries a *logical* link
     ``(ks_id, triang_id, tdf_conifold_id)`` into the full TDF dataset;
@@ -161,7 +241,7 @@ class KKLTDatabase(LCSDatabase):
     ``coni_class``; this grouping cuts across triangulations of the same
     polytope.
 
-    Three local catalogs live under ``<cache_dir>/kklt_vacua/``:
+    Three local catalogs live under ``<cache_dir>/kklt/``:
 
     - ``catalog.parquet`` (polytope-grain): one row per ``ks_id`` with
       ``h11``, ``h12``, ``chi``, ``n_rigids_dual``, ``Q``,
@@ -173,10 +253,10 @@ class KKLTDatabase(LCSDatabase):
     - ``conifold_catalog.parquet``: one row per
       ``(ks_id, coni_class_id, coni_id)``, carrying the logical TDF link.
 
-    An append-only ``run_log.parquet`` records cluster runs
-    (``scope="class"`` or ``scope="conifold"``) for run-tracking and
-    provenance.  See :meth:`start_run`, :meth:`finish_run`,
-    :meth:`run_status`.
+    Optional local ``run_log.parquet`` records cluster runs
+    (``scope="class"`` or ``scope="conifold"``) for private/local
+    run-tracking.  Public designated vacuum records belong in the
+    shared ``vacua_vault/kklt_vacua`` area.
 
     A *TDF-compat fingerprint* (``tdf_schema_version``,
     ``tdf_catalog_sha256``) is stored in ``schema.json`` at build time
@@ -196,8 +276,8 @@ class KKLTDatabase(LCSDatabase):
     """
 
     # Consumed by :meth:`CYDatabase.from_local` so that
-    # ``KKLTDatabase.from_local(path)`` infers ``dataset="kklt_vacua"``.
-    _DATASET: str = "kklt_vacua"
+    # ``KKLTDatabase.from_local(path)`` infers ``dataset="kklt"``.
+    _DATASET: str = "kklt"
 
     @classmethod
     def from_local(  # type: ignore[override]
@@ -216,11 +296,10 @@ class KKLTDatabase(LCSDatabase):
 
         Args:
             path (str | Path): KKLT cache root (the directory
-                *containing* ``kklt_vacua/``, or the
-                ``kklt_vacua/`` directory itself).
+                *containing* ``kklt/``, or the ``kklt/`` directory
+                itself).
             dataset (str | None): Sub-dataset id; must be
-                ``"kklt_vacua"`` if supplied.  Defaults to
-                ``cls._DATASET``.
+                ``"kklt"`` if supplied.  Defaults to ``cls._DATASET``.
             shard_cache_size (int): LRU shard cache size for KKLT
                 (does not affect the wrapped TDF).
             tdf_db (LCSDatabase | None): Pre-built TDF database.
@@ -286,8 +365,8 @@ class KKLTDatabase(LCSDatabase):
                 ``shard_cache_size`` settings and the same parent
                 ``cache_dir``.
             hf_repo (str | None): HuggingFace repository ID for the
-                ``kklt_vacua`` parquet shards.  Defaults to the value
-                returned by :func:`_resolve_kklt_hf_repo`.
+                ``kklt`` parquet shards.  Defaults to the general
+                cy-database repository.
             cache_dir (str | None): Local cache directory.  Defaults to
                 the global ``stringforge.data_dir``.
             offline (bool): If ``True``, no network access is attempted.
@@ -298,19 +377,20 @@ class KKLTDatabase(LCSDatabase):
                 :class:`~stringforge.cy_io.CYDatabase`.
             dataset (str | None): Accepted for compatibility with
                 :meth:`~stringforge.cy_io.CYDatabase.from_local`; must
-                equal ``"kklt_vacua"`` if supplied.
+                equal ``"kklt"`` if supplied.
 
         Raises:
             ValueError: If ``dataset`` is supplied and is not
-                ``"kklt_vacua"``.
+                ``"kklt"``.
         """
-        if dataset is not None and dataset != "kklt_vacua":
+        if dataset is not None and dataset != self._DATASET:
             raise ValueError(
-                f"KKLTDatabase requires dataset='kklt_vacua'; got {dataset!r}"
+                f"KKLTDatabase requires dataset={self._DATASET!r}; "
+                f"got {dataset!r}"
             )
 
         super().__init__(
-            dataset="kklt_vacua",
+            dataset=self._DATASET,
             hf_repo=hf_repo or _resolve_kklt_hf_repo(),
             cache_dir=cache_dir,
             offline=offline,
@@ -570,6 +650,9 @@ class KKLTDatabase(LCSDatabase):
         n_rigids_dual_min: Optional[int] = None,
         n_coni_classes_min: Optional[int] = None,
         n_coni_classes_max: Optional[int] = None,
+        tags_include: Optional[Union[str, List[str]]] = None,
+        tags_exclude: Optional[Union[str, List[str]]] = None,
+        tag_mode: str = "all",
         **filters: Any,
     ) -> Any:
         r"""
@@ -597,6 +680,12 @@ class KKLTDatabase(LCSDatabase):
                 classes on the polytope.
             n_coni_classes_max (int | None): Maximum number of conifold
                 classes on the polytope.
+            tags_include (str | list[str] | None): Require rows to carry
+                these tag labels.  Tags are read from the ``tags`` column.
+            tags_exclude (str | list[str] | None): Reject rows carrying
+                any of these tag labels.
+            tag_mode (str): ``"all"`` requires every include tag;
+                ``"any"`` requires at least one include tag.
             **filters: Additional exact-match filters on catalog columns.
 
         Returns:
@@ -635,6 +724,13 @@ class KKLTDatabase(LCSDatabase):
                     "filter ignored."
                 )
 
+        mask = _apply_tag_filters(
+            cat,
+            mask,
+            tags_include=tags_include,
+            tags_exclude=tags_exclude,
+            tag_mode=tag_mode,
+        )
         out = _swap_h_columns(cat[mask].reset_index(drop=True))
         return out.drop(columns=["chi"], errors="ignore")
 
@@ -668,6 +764,9 @@ class KKLTDatabase(LCSDatabase):
         h12: Optional[int] = None,
         n_conifolds_in_class_min: Optional[int] = None,
         n_conifolds_in_class_max: Optional[int] = None,
+        tags_include: Optional[Union[str, List[str]]] = None,
+        tags_exclude: Optional[Union[str, List[str]]] = None,
+        tag_mode: str = "all",
         **filters: Any,
     ) -> Any:
         r"""
@@ -685,6 +784,12 @@ class KKLTDatabase(LCSDatabase):
             n_conifolds_in_class_min (int | None): Minimum number of
                 individual conifolds in the class.
             n_conifolds_in_class_max (int | None): Maximum number.
+            tags_include (str | list[str] | None): Require rows to carry
+                these tag labels.  Tags are read from the ``tags`` column.
+            tags_exclude (str | list[str] | None): Reject rows carrying
+                any of these tag labels.
+            tag_mode (str): ``"all"`` requires every include tag;
+                ``"any"`` requires at least one include tag.
             **filters: Additional exact-match filters.
 
         Returns:
@@ -717,6 +822,13 @@ class KKLTDatabase(LCSDatabase):
                     "filter ignored."
                 )
 
+        mask = _apply_tag_filters(
+            cat,
+            mask,
+            tags_include=tags_include,
+            tags_exclude=tags_exclude,
+            tag_mode=tag_mode,
+        )
         df = cat[mask].reset_index(drop=True)
         if "h11" in df.columns and "h12" in df.columns:
             df = _swap_h_columns(df)
@@ -731,6 +843,9 @@ class KKLTDatabase(LCSDatabase):
         h11: Optional[int] = None,
         h12: Optional[int] = None,
         tdf_status: Optional[str] = None,
+        tags_include: Optional[Union[str, List[str]]] = None,
+        tags_exclude: Optional[Union[str, List[str]]] = None,
+        tag_mode: str = "all",
         **filters: Any,
     ) -> Any:
         r"""
@@ -752,6 +867,12 @@ class KKLTDatabase(LCSDatabase):
             tdf_status (str | None): Filter by TDF-link status
                 (``"ok"`` or ``"orphaned"``).  Populated by
                 :meth:`rebuild_links` after a TDF rebuild.
+            tags_include (str | list[str] | None): Require rows to carry
+                these tag labels.  Tags are read from the ``tags`` column.
+            tags_exclude (str | list[str] | None): Reject rows carrying
+                any of these tag labels.
+            tag_mode (str): ``"all"`` requires every include tag;
+                ``"any"`` requires at least one include tag.
             **filters: Additional exact-match filters.
 
         Returns:
@@ -785,6 +906,13 @@ class KKLTDatabase(LCSDatabase):
                     "filter ignored."
                 )
 
+        mask = _apply_tag_filters(
+            cat,
+            mask,
+            tags_include=tags_include,
+            tags_exclude=tags_exclude,
+            tag_mode=tag_mode,
+        )
         df = cat[mask].reset_index(drop=True)
         if "h11" in df.columns and "h12" in df.columns:
             df = _swap_h_columns(df)
@@ -1322,11 +1450,11 @@ class KKLTDatabase(LCSDatabase):
             not requested or not available):
 
             - ``"kklt_polytope"``  (``pandas.Series``): row from
-              ``kklt_vacua/catalog.parquet``;
+              ``kklt/catalog.parquet``;
             - ``"kklt_class"``     (``pandas.Series``): row from
-              ``kklt_vacua/conifold_class_catalog.parquet``;
+              ``kklt/conifold_class_catalog.parquet``;
             - ``"kklt_conifold"``  (``pandas.Series``): row from
-              ``kklt_vacua/conifold_catalog.parquet``;
+              ``kklt/conifold_catalog.parquet``;
             - ``"lcs"``            (``pandas.Series``): row from
               ``tdf/lcs_data/h11_<n>/data-XXXXX.parquet``;
             - ``"gv"``             (``pandas.Series``): row from the
@@ -1695,7 +1823,7 @@ class KKLTDatabase(LCSDatabase):
     #
     # Layout (per stage):
     #
-    #   <cache_dir>/kklt_vacua/<stage>/<kind?>/
+    #   <cache_dir>/kklt/<stage>/<kind?>/
     #       h11_<n>_h12_<m>_ksid_<id>/
     #           coniclass_<c>_coni_<k>/
     #               run_<run_id>.parquet
@@ -1915,7 +2043,7 @@ class KKLTDatabase(LCSDatabase):
         extra_columns: Optional[Dict[str, Any]] = None,
     ) -> Path:
         r"""Append a PFV fragment under
-        ``<cache>/kklt_vacua/pfv/<kind>/.../run_<run_id>.parquet``.
+        ``<cache>/kklt/pfv/<kind>/.../run_<run_id>.parquet``.
 
         Args:
             rows: Open-ended row payload (DataFrame or list of dicts).
@@ -1986,7 +2114,7 @@ class KKLTDatabase(LCSDatabase):
         extra_columns: Optional[Dict[str, Any]] = None,
     ) -> Path:
         r"""Append a precursor-stage fragment under
-        ``<cache>/kklt_vacua/precursor/<kind>/.../run_<run_id>.parquet``.
+        ``<cache>/kklt/precursor/<kind>/.../run_<run_id>.parquet``.
 
         Args:
             rows: Open-ended row payload.  May carry any solver-specific
@@ -2051,7 +2179,7 @@ class KKLTDatabase(LCSDatabase):
         extra_columns: Optional[Dict[str, Any]] = None,
     ) -> Path:
         r"""Append a full-stabilisation-vacua fragment under
-        ``<cache>/kklt_vacua/vacua/.../run_<run_id>.parquet``.
+        ``<cache>/kklt/vacua/.../run_<run_id>.parquet``.
 
         Args:
             rows: Open-ended row payload — any solver-specific columns
@@ -2660,7 +2788,7 @@ class KKLTDatabase(LCSDatabase):
             with open(schema_path) as f:
                 schema = json.load(f)
         else:
-            schema = {"schema_version": 1, "dataset": "kklt_vacua"}
+            schema = {"schema_version": 1, "dataset": self._DATASET}
         schema["tdf_schema_version"] = new_version
         schema["tdf_catalog_sha256"] = new_hash
         with open(schema_path, "w") as f:

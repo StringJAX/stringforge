@@ -2,6 +2,10 @@
 
 **JAX-compatible polylogarithm functions with automatic differentiation.**
 
+> **Source:** <https://github.com/AndreasSchachner/jaxpolylog>
+> &nbsp;&nbsp;|&nbsp;&nbsp; **Documentation:** <https://jaxpolylog.readthedocs.io>
+> &nbsp;&nbsp;|&nbsp;&nbsp; **PyPI:** <https://pypi.org/project/jaxpolylog/>
+
 JAXPolyLog provides $\mathrm{Li}_s(z)$ implementations that are compatible with
 JAX's tracing model — `jit`, `vmap`, `grad`, double `jacfwd`, etc. all work.
 The library is the polylog dependency for any package in the ecosystem that
@@ -27,8 +31,8 @@ Public.
 
 - [`jaxvacua`](jaxvacua) — `css`, `periods`, and the conifold submodules call
   `jax_polylog_vmap` for the instanton sum.
-- [`kahlerjax`](kahlerjax) — `kahler_sector_N2` calls `jax_polylog_vmap` for
-  the curve-instanton sum at higher polylog order.
+- Planned Kähler-sector packages — expected to use vectorised polylogarithms
+  for curve-instanton sums once their public APIs are released.
 
 ## Usage
 
@@ -50,3 +54,7 @@ dLi3_dz = jax.grad(lambda x: jax_polylog(x, s=3, p_range=20, approx="patch").rea
 ## Links
 
 - **Source:** <https://github.com/AndreasSchachner/jaxpolylog>
+- **Documentation:** <https://jaxpolylog.readthedocs.io>
+- **PyPI:** <https://pypi.org/project/jaxpolylog/>
+- **Reference:** the [JAXVacua framework paper](https://arxiv.org/abs/2306.06160)
+  for the instanton sum where JAXPolyLog is used.

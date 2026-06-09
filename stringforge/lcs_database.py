@@ -120,7 +120,7 @@ def _parse_lcs_row(row: Any, dataset: str) -> Dict[str, Any]:
     kwargs = dict(
         h11          = int(row["h11"]),
         h12          = int(row["h12"]),
-        chi          = int(row["chi"])  if "chi"  in row.index else None,
+        #chi          = int(row["chi"])  if "chi"  in row.index else None,
         intnums_coo  = intnums_coo,
         c2           = _decode_array(row.get("c2")),
         a_matrix     = _decode_array(row.get("a_matrix")),
@@ -144,21 +144,20 @@ def _parse_lcs_row(row: Any, dataset: str) -> Dict[str, Any]:
 
 
 class LCSDatabase(CYDatabase):
-    """CYDatabase extended with lcs_tree / FluxVacuaFinder construction
-    and vacua persistence (via a composed VacuaWriter).
+    """Database layer that bridges cached geometry rows into JAXVacua.
 
-    Supports single-model (`load`, `load_model`) and batch/ensemble workflows
-    (`load_batch`, `iter_batch`, `load_model_batch`, `iter_model_batch`,
-    `sample`).  Higher-level ensemble operations (e.g. "find vacua across the
-    ensemble and auto-designate") are out of scope — they can be added later
-    as a separate `ModelEnsemble` class composing LCSDatabase + VacuaWriter.
+    ``LCSDatabase`` extends the pure-I/O :class:`CYDatabase` with
+    ``lcs_tree`` and ``FluxVacuaFinder`` construction, batch loading, sampling,
+    and delegation to :class:`stringforge.vacua_writer.VacuaWriter` for vacua
+    persistence.  It owns the data/convention boundary; the physical
+    computations performed by returned models are owned by JAXVacua.
     """
 
     def __new__(cls, *args: Any, **kwargs: Any) -> "LCSDatabase":
         r"""Factory dispatch.
 
-        When the user constructs ``LCSDatabase(dataset="kklt_vacua")`` or
-        ``LCSDatabase("kklt_vacua")`` directly, return a
+        When the user constructs ``LCSDatabase(dataset="kklt")`` or
+        ``LCSDatabase("kklt")`` directly, return a
         :class:`~stringforge.kklt_database.KKLTDatabase` instance instead.
         Python then calls
         :meth:`KKLTDatabase.__init__` on the returned object (because
@@ -168,7 +167,7 @@ class LCSDatabase(CYDatabase):
         dataset = kwargs.get("dataset")
         if dataset is None and args:
             dataset = args[0]
-        if cls is LCSDatabase and dataset == "kklt_vacua":
+        if cls is LCSDatabase and dataset == "kklt":
             from .kklt_database import KKLTDatabase
             return object.__new__(KKLTDatabase)
         return super().__new__(cls)
@@ -486,6 +485,13 @@ class LCSDatabase(CYDatabase):
         kwargs["h11"] = h12
         kwargs["h12"] = h11
         kwargs["chi"] = None
+        
+        if h11 == 0 or h12 == 0:
+            warnings.warn(
+                "One of the Hodge numbers is zero, which may lead to "
+                "unexpected behavior in some JAXVacua computations. "
+                "Proceed with caution."
+            )
         
         # ---- Optionally fetch conifold data --------------------------------
         # Conifold shards are sharded by *catalog* h11 (the on-disk

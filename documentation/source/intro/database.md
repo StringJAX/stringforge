@@ -1,172 +1,107 @@
 # Calabi-Yau Geometry Database
 
-## Overview
+StringForge provides access to large Calabi-Yau geometry datasets through a
+unified interface.  Data are hosted on HuggingFace and downloaded lazily: the
+constructor performs no network access, catalogue files are fetched on first
+query, and geometry shards are fetched only when a model is loaded.
 
-StringForge provides access to large databases of Calabi-Yau threefold geometries through a unified interface. The data is hosted on [HuggingFace](https://huggingface.co/datasets/aschachner/cy-database) and downloaded on demand — only the files you actually need are fetched and cached locally.
+```{important}
+There are three related but distinct layers:
 
-Three databases are currently available:
+1. **TDF/CICY geometry databases** store Calabi-Yau data.
+2. **KKLT curated subset** stores specialised conifold-class provenance and
+   logical links back to TDF rows.
+3. **`vacua_vault`** is one shared repository for designated vacuum solutions,
+   with dataset-specific metadata in each record.
+```
 
-- **Toric Divisor Flux (TDF)** models from the [Kreuzer-Skarke list](https://arxiv.org/abs/hep-th/0002240), identified by `(ks_id, triang_id)`. These are Calabi-Yau hypersurfaces in toric varieties, constructed from reflexive polytopes.
-- **Complete Intersection Calabi-Yau (CICY)** models from the [CICY list](https://arxiv.org/abs/hep-th/8602060), identified by `cicy_id`.
-- **KKLT vacua** — a curated subset of TDF (polytopes with `n_rigids_dual > h12`) indexed by **conifold class**, with a built-in run-tracking layer for persistent provenance of cluster work. Hosted in a separate HuggingFace repo `aschachner/kklt-vacua-database`. See [kklt_vacua_database](kklt_vacua_database.md) for details.
+## Available database interfaces
 
-Each model in the database carries:
-- Topological data: intersection numbers $\kappa_{ijk}$, second Chern class $c_2$, Euler characteristic $\chi$, Hodge numbers $h^{1,1}$ and $h^{2,1}$
-- Kähler cone data: generators, hyperplane constraints
-- (Optional) Gopakumar-Vafa / Gromov-Witten invariants
-- (Optional) Conifold limit data: conifold curves, GV invariants of shrinking cycles, basis change matrices
-- (Optional) Extra precomputed properties: D3-tadpole $\chi/24$, etc.
+- **TDF models** from the Kreuzer-Skarke list, addressed by `(ks_id,
+  triang_id)`, through `TDFDatabase` and `LCSDatabase(dataset="tdf")`.
+- **CICY models** from the complete-intersection Calabi-Yau list, addressed by
+  `cicy_id`, through `CICYDatabase` and `LCSDatabase(dataset="cicy")`.
+- **KKLT index**, an advanced curated TDF subset indexed by conifold class
+  with curation tags, through `KKLTDatabase`.  See [KKLT Database](./kklt_database.md)
+  after reading this page.
+
+Each model may carry topological data, Kähler-cone data, optional GV/GW
+invariants, optional conifold-limit data, and extra precomputed properties.
 
 ## Two ways to load models
 
-The StringForge ecosystem supports two complementary ways to load Calabi-Yau geometry:
+### Pure I/O
 
-### Local models (`model_ID`)
-
-A small set of pre-computed models is shipped with the jaxvacua package itself. These are loaded via the `model_ID` parameter:
-
-```python
-import jaxvacua as jvc
-model = jvc.FluxVacuaFinder(h12=2, model_ID=1, model_type="KS", maximum_degree=2)
-```
-
-This requires no internet connection and no external dependencies beyond the local package data. It is ideal for quick tests, tutorials, and reproducibility.
-
-### HuggingFace database
-
-For large-scale studies involving thousands or millions of geometries, the database API in `stringforge` provides access to the full Kreuzer-Skarke and CICY lists:
+Use `CYDatabase`, `TDFDatabase`, or `CICYDatabase` when you want catalogue rows
+and raw data without constructing a physics model.
 
 ```python
-from stringforge.cy_io import TDFDatabase
-from stringforge.lcs_database import LCSDatabase
+from stringforge import TDFDatabase
 
-# Pure I/O — returns geometric data
 db = TDFDatabase()
-tree = db.load(ks_id=12345, triang_id=0, include_gv=True)
-
-# Model construction — returns a ready-to-use FluxVacuaFinder
-db = LCSDatabase(dataset="tdf")
-model = db.load_model(ks_id=12345, triang_id=0, Q=24)
+df = db.query(h11=2)
 ```
 
-This requires the `huggingface-hub`, `pandas`, and `pyarrow` packages, plus `jaxvacua` (only invoked at the model-construction stage; pure I/O does not need it).
+### JAXVacua bridge
+
+Use `LCSDatabase` when you want the public surface in mirror convention and want
+to construct JAXVacua-compatible objects.
+
+```python
+from stringforge import LCSDatabase
+
+db = LCSDatabase(dataset="tdf")
+rows = db.query(h12=2).head()
+row = rows.iloc[0]
+
+tree = db.load(
+    h11=int(row["h11"]),
+    h12=int(row["h12"]),
+    ks_id=int(row["ks_id"]),
+    triang_id=int(row["triang_id"]),
+)
+model = db.load_model(
+    h11=int(row["h11"]),
+    h12=int(row["h12"]),
+    ks_id=int(row["ks_id"]),
+    triang_id=int(row["triang_id"]),
+)
+```
 
 ```{eval-rst}
 .. raw:: html
    :file: ../_static/figures/f2_database_flow.html
 ```
 
-## How the database is organised
-
-The HuggingFace repository is structured into **splits**, each stored as a collection of [Parquet](https://parquet.apache.org/) shards:
-
-```
-aschachner/cy-database/
-    tdf/
-        catalog.parquet           ← lightweight index (downloaded once)
-        schema.json               ← version metadata
-        lcs_data/h11_{N}/
-            data-00000.parquet    ← geometry data, sharded by h11
-            data-00001.parquet
-            ...
-        gv/h11_{N}/
-            data-00000.parquet    ← Gopakumar-Vafa invariants, sharded by h11
-        conifolds/h11_{N}/
-            data-00000.parquet    ← conifold limit data, sharded by h11
-        extra/
-            data-00000.parquet    ← additional properties
-        polytope/
-            data-00000.parquet    ← polytope vertex data (tdf only)
-    cicy/
-        ...                       ← same structure for CICY models
-```
-
-The **catalog** is a small file (~tens of KB) that maps every model to its location in the shards via `(shard_id, row_index)` pointers. It is loaded into memory on first access and serves all subsequent queries without network I/O.
-
 ## Lazy downloading and caching
 
-The database uses a **lazy download** strategy:
+The cache defaults to `.stringforge_cache/` in the current working directory.
+Change it globally with `stringforge.set_data_dir()` or the
+`STRINGFORGE_DATA_DIR` environment variable, or per instance with `cache_dir=`.
 
-1. **Constructor** (`TDFDatabase()`) — does nothing. No network calls.
-2. **Querying** (`db.query(h11=2)`) — downloads only the catalog (once).
-3. **Loading** (`db.load(...)`) — downloads only the specific shard(s) containing the requested model.
-4. **Batch loading** (`db.load_batch(h11=2)`) — downloads shards as needed.
+| Step | Network behaviour |
+| --- | --- |
+| Constructor | No network access. |
+| `query(...)` | Downloads the lightweight catalogue once. |
+| `load(...)` | Downloads only the shard containing the requested row. |
+| `load_batch(...)` | Downloads only shards needed by the batch. |
 
-Downloaded files are cached in `.stringforge_cache/` (in the current working directory) by default. This keeps data visible and project-local. The location can be changed globally via `stringforge.set_data_dir()` or the `STRINGFORGE_DATA_DIR` environment variable, or per-instance via the `cache_dir` constructor argument.
-
-Subsequent loads of models in the same shard are served from disk (or from an in-memory LRU cache for recently accessed shards). A one-time warning is issued if the data directory exceeds 500 MB.
-
-### Cache modes
-
-The `cache_mode` constructor parameter controls how aggressively files are cached:
-
-| `cache_mode` | Behaviour | Use case |
-|---|---|---|
-| `"persistent"` (default) | Keep shard files on disk and in LRU memory cache | Repeated access, interactive work |
-| `"none"` | Download shard, read needed row, delete shard from disk | Scanning millions of models without disk accumulation |
-
-```python
-# For large-scale scans
-db = TDFDatabase(cache_mode="none")
-trees = db.load_batch(h11=3)  # shards deleted after each read
-```
-
-To manually clear the persistent cache:
-
-```python
-db.clear_cache()                    # delete shards, keep catalog
-db.clear_cache(include_vacua=True)  # also delete stored vacuum solutions
-```
-
-## Key API methods
-
-| Method | Description |
-|--------|-------------|
-| `db.query(h11=..., h12=..., ...)` | Filter the catalog, return a DataFrame |
-| `db.query_conifolds(ks_id=...)` | Query the conifold sub-catalog |
-| `db.load(ks_id=..., triang_id=...)` | Load a single model as `lcs_tree` |
-| `db.load_model(ks_id=..., Q=24)` | Load as a ready-to-use `FluxVacuaFinder` (`LCSDatabase` only) |
-| `db.load_batch(df)` or `db.load_batch(h11=2)` | Load multiple models |
-| `db.sample(n=10, h11=2)` | Random sample of models |
-| `db.info()` | Print database summary |
-| `db.clear_cache()` | Delete cached shard files |
-
-## Offline mode
-
-For HPC clusters without internet access:
-
-1. Warm the cache on a machine with internet: load the models you need.
-2. Copy the local cache directory (default: `.stringforge_cache/`) to the cluster.
-3. Use `TDFDatabase(offline=True)` — all data served from cache.
+Use `cache_mode="none"` when scanning many models without keeping downloaded
+shards on disk.  Use `offline=True` after warming a cache for cluster jobs.
 
 ## Environment variables
 
 | Variable | Default | Description |
-|---|---|---|
-| `STRINGFORGE_DATA_DIR` | `{cwd}/.stringforge_cache` | Override the data directory for all database operations |
-| `STRINGFORGE_HF_REPO` | `aschachner/cy-database` | Override the HuggingFace repository ID |
-| `STRINGFORGE_VAULT` | (auto-detect) | Override the vacua-vault directory (see vault docs) |
-| `STRINGFORGE_VAULT_REPO` | `aschachner/vacua_vault` | Override the HuggingFace vault repository ID |
+| --- | --- | --- |
+| `STRINGFORGE_DATA_DIR` | `{cwd}/.stringforge_cache` | Global data/cache directory. |
+| `STRINGFORGE_HF_REPO` | `aschachner/cy-database` | Geometry database repository. |
+| `STRINGFORGE_VAULT` | explicit or repo-local | Local designated-vacua directory. |
+| `STRINGFORGE_VAULT_REPO` | `aschachner/vacua_vault` | Shared HuggingFace vault repository. |
 
 ## Further reading
 
-### On this site
-
-- {doc}`Tutorial notebook: Database interface <../tutorials/database_and_infrastructure/database_interface>`
-- {doc}`Tutorial notebook: Vacua storage <../tutorials/database_and_infrastructure/vacua_storage>`
-- {doc}`Tutorial notebook: Cluster parallelisation <../tutorials/database_and_infrastructure/cluster_parallelisation>`
-- {doc}`API reference: stringforge.cy_io <../api/stringforge.cy_io>`
-- {doc}`API reference: stringforge.lcs_database <../api/stringforge.lcs_database>`
-
-### Physics background
-
-The physics intros (Calabi–Yau geometries, periods, flux compactifications,
-moduli stabilisation, perturbatively flat vacua, Type-IIB supergravity) live
-in the JAXVacua documentation and are not duplicated here:
-
-- [Calabi-Yau geometries](https://jaxvacua.readthedocs.io/en/latest/intro/geometries.html) — Calabi-Yau threefolds, KS polytopes, CICYs.
-- [Period calculations](https://jaxvacua.readthedocs.io/en/latest/intro/periods.html) — period vector and prepotential.
-- [Type IIB flux compactifications](https://jaxvacua.readthedocs.io/en/latest/intro/flux_compactifications.html) — Type-IIB flux backgrounds.
-- [Moduli stabilisation](https://jaxvacua.readthedocs.io/en/latest/intro/moduli_stabilisation.html) — moduli stabilisation patterns.
-- [Perturbatively flat vacua](https://jaxvacua.readthedocs.io/en/latest/intro/pfv.html) — perturbatively flat vacua.
-- [Type-IIB supergravity](https://jaxvacua.readthedocs.io/en/latest/intro/sugra.html) — 4-D N=1 Type-IIB supergravity.
+- [Database interface tutorial](../tutorials/database_and_infrastructure/database_interface)
+- [Vacua storage tutorial](../tutorials/database_and_infrastructure/vacua_storage)
+- [Cluster parallelisation tutorial](../tutorials/database_and_infrastructure/cluster_parallelisation)
+- [KKLT Database](./kklt_database.md)
+- [API reference](../api/index)

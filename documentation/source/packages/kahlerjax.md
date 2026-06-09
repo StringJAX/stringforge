@@ -1,45 +1,35 @@
 # KahlerJAX
 
-```{admonition} Planned
-:class: note
-KahlerJAX is under development and will be released publicly in a future
-version of StringForge. This page is a placeholder for the package's public
-overview. The architecture page describes the planned module surface; the
-links section will be populated when the docs go live.
+```{admonition} Planned package; API not stable
+:class: warning
+KahlerJAX is not part of the first public StringForge release.  It is shown here
+to explain the intended ecosystem boundary.  Do not treat the module names,
+examples, or planned interfaces below as stable public API, and do not expect
+StringForge to install or import KahlerJAX.
 ```
 
-**Numerical Kähler moduli stabilisation for 4D N=1 effective field theories.**
+**Planned role:** Kähler-moduli stabilisation for four-dimensional N=1 effective
+field theories.
 
-KahlerJAX extends the ecosystem to the Kähler-moduli sector of string
-compactifications. It provides tools for constructing and stabilising the
-Kähler potential of arbitrary four-dimensional N=1 EFTs obtained from Calabi–Yau
-compactifications, including non-perturbative effects and α′-corrections.
+KahlerJAX is intended to consume Calabi-Yau data and shared conventions from the
+StringForge ecosystem while owning the Kähler-sector physics itself.  StringForge
+will remain the infrastructure layer: it will not absorb the Kähler solver.
 
-## Status
+## Planned ownership
 
-Planned (public release pending).
+- Kähler-sector data containers and model construction.
+- Kähler-potential corrections and non-perturbative superpotential ingredients.
+- Stabilisation routines and diagnostics for Kähler moduli.
 
-## What it owns (planned surface)
+## Current release status
 
-- **`kahlerjax.kahler_sector_N2.kahler_sector`** — Kähler-potential corrections
-  (BBHL-type), N=2 α′-corrections, instanton-induced superpotential.
-- **`kahlerjax.cytree.cytree`** — KahlerJAX's own pytree carrying the Kähler-side
-  data. **Distinct from** `jaxvacua.lcs.lcs_tree`.
-- **`kahlerjax.toric_curves`, `kahlerjax.divisors_*`, `kahlerjax.orientifolds_utils`** —
-  toric-geometry helpers feeding the Kähler-sector calculation.
+- Not a StringForge dependency.
+- Not imported by `stringforge`.
+- No install command or source link is provided here until public release.
+- Public documentation will be linked once the package is released.
 
-## What it consumes
+## Related packages
 
-- [`cytools`](cytools) — `Polytope`, `Triangulation`, `CalabiYau` for the toric
-  data layer (heavily used).
-- [`jaxpolylog`](jaxpolylog) — `jax_polylog_vmap` for higher-order polylog
-  expansions in the curve-instanton sum.
-
-## Used by
-
-- [`jaxiverse`](jaxiverse) — extends `kahler_sector` for axion EFTs.
-
-## Links
-
-- **Source / docs:** to be populated when public.
-- **Reference paper:** [arXiv:2507.00615](https://arxiv.org/abs/2507.00615).
+- [`cytools`](cytools) for geometric input.
+- [`jaxpolylog`](jaxpolylog) for differentiable polylogarithms where needed.
+- [`jaxvacua`](jaxvacua) for the complex-structure/axio-dilaton flux sector.

@@ -739,7 +739,7 @@ class VacuaWriter:
 
     Construct with ``VacuaWriter(db)`` where ``db`` is an instance of
     :class:`stringforge.cy_io.CYDatabase` (or any class implementing the same
-    I/O surface — e.g. :class:`jaxvacua.lcs_database.LCSDatabase`).
+    I/O surface — e.g. :class:`stringforge.lcs_database.LCSDatabase`).
     """
 
     # Attribute names that live on the VacuaWriter itself rather than being
