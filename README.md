@@ -2,7 +2,7 @@
 
 **Shared database, model-loading, and vacua-vault infrastructure for string-compactification workflows.**
 
-StringForge is the infrastructure layer for the StringForge ecosystem of JAX-based string-compactification packages. It provides reproducible access to Calabi-Yau geometry databases, bridges those data into physics engines such as [JAXVacua](https://github.com/AndreasSchachner/jaxvacua), and manages persistent vacuum-solution storage with provenance.
+StringForge is the infrastructure layer for the [StringJAX](https://github.com/AndreasSchachner/stringjax) ecosystem of JAX-based string-compactification packages. It provides reproducible access to Calabi-Yau geometry databases, bridges those data into physics engines such as [JAXVacua](https://github.com/AndreasSchachner/jaxvacua), and manages persistent vacuum-solution storage with provenance.
 
 The package is intentionally solver-light. It does not replace JAXVacua, KahlerJAX, JAXiverse, or CYTools. Instead, it standardises the shared conventions that those packages and downstream scans need: catalogue queries, lazy downloads, cache/offline workflows, model loading, vault layout, validation, and curation.
 
