@@ -74,7 +74,7 @@ curated results.  Pass ``offline=True`` to a database constructor, or use
 ``from_local(...)``, to disable network access.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 # ── Data directory ────────────────────────────────────────────────────────
 # Default location for database cache files.  Override

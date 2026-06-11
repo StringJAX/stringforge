@@ -55,3 +55,8 @@ jobs:
           path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Idempotent: if this version was already uploaded (e.g. manually via
+          # twine), skip it instead of failing.  Lets a tag push coexist with a
+          # manual release without a red workflow run.
+          skip-existing: true
