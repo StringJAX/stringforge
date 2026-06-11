@@ -1,0 +1,28 @@
+# Read the Docs build configuration for the StringForge documentation.
+#
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for the full
+# reference.  Layout mirrors jaxpolylog / jaxvacua: `documentation/` is the
+# build root with a `source/` subdirectory and a sibling `requirements.txt`.
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.12"
+
+sphinx:
+  configuration: documentation/source/conf.py
+  fail_on_warning: false
+
+formats:
+  - htmlzip
+  - pdf
+
+# Install only the documentation toolchain.  We do NOT `pip install .`:
+# stringforge depends (transitively, via jaxvacua) on cytools / gurobipy /
+# python-flint, which are not installable on Read the Docs and would hard-fail
+# the build.  `documentation/source/conf.py` prepends the repo root to
+# `sys.path` so stringforge is importable from source for autodoc.
+python:
+  install:
+    - requirements: documentation/requirements.txt
