@@ -32,13 +32,23 @@ compactifications on Calabi–Yau threefolds. Solutions are stored per-model and
 cross-referenced against the geometry catalogue
 [`aschachner/cy-database`](https://huggingface.co/datasets/aschachner/cy-database).
 
-> **Scope.** This repository stores **solutions** (flux vectors, stabilised
-> moduli, tadpole values, classification flags, metadata). It does **not**
-> store the underlying geometries; those live in the geometry repo above.
+**Scope.** This repository stores **flux-sector vacua** — solutions of the
+complex-structure + axio-dilaton flux equations (flux vectors, stabilised
+moduli, tadpole values, classification flags, metadata). It does **not**
+store the underlying geometries; those live in the geometry repo above.
 
-Maintained for use with the [`jaxvacua`](https://github.com/aschachner/jaxvacua)
-Python package, but the parquet schema is library-agnostic — any tool that can
-read Apache Arrow can consume the data.
+**KKLT / de Sitter constructions are out of scope here.** Vacua that
+additionally stabilise the *Kähler* moduli — KKLT-type non-perturbative
+superpotentials, de Sitter uplifts — are maintained in a **separate
+dedicated repository**. This vault is limited to the flux
+(complex-structure + dilaton) sector; the overall Calabi–Yau volume is left
+unfixed (see the mass-units note in §3.2).
+
+Maintained for use with the [`stringforge`](https://github.com/aschachner/stringforge)
+package (database/vault I/O) together with
+[`jaxvacua`](https://github.com/aschachner/jaxvacua) (flux-vacuum physics), but
+the parquet schema is library-agnostic — any tool that can read Apache Arrow can
+consume the data.
 
 ---
 
@@ -69,14 +79,15 @@ Curated datasets sit **directly** in each model directory. `community/`
 is a submission queue for pending (unreviewed) contributions; once
 reviewed, files move out of `community/` up to the model level.
 
-> **Homogeneity invariant.** Each parquet file in the vault contains
-> rows describing **exactly one model** — every row of a given file
-> shares the same `(ks_id, triang_id)` (TDF) or `cicy_id` (CICY).
-> The directory layout (`<dataset>/h12_N/<identifier>/<label>.parquet`)
-> makes one-file-per-model the natural unit, and the catalogue,
-> server-side validation, and the `validate_parquet_file` auto-load
-> path all rely on this assumption. Mixed-model files are rejected
-> by `validate_parquet_file` with a clear top-level error.
+**Homogeneity invariant.** Each parquet file in the vault contains
+rows describing **exactly one model** — every row of a given file
+shares the same `(ks_id, triang_id)` (TDF), `cicy_id` (CICY), or
+`model_ID` (local jaxvacua models).
+The directory layout (`<namespace>/h12_N/<identifier>/<label>.parquet`)
+makes one-file-per-model the natural unit, and the catalogue,
+server-side validation, and the `validate_parquet_file` auto-load
+path all rely on this assumption. Mixed-model files are rejected
+by `validate_parquet_file` with a clear top-level error.
 
 ```
 vacua_vault/
@@ -91,27 +102,35 @@ vacua_vault/
 │   │   │   ├── nonSUSY_ISD-_Nmax200.parquet       # curated
 │   │   │   ├── community/                          # pending submissions queue
 │   │   │   │   ├── alice-hf_racetrack_W0_small.parquet
-│   │   │   │   └── bob-hf_dS_candidates.parquet
+│   │   │   │   └── bob-hf_nonSUSY_critpts.parquet
 │   │   │   └── _rejected/                          # (optional, split-mode only)
 │   │   │       └── alice-hf_racetrack_W0_small.rejected.parquet
 │   │   └── ...
 │   └── h12_3/
 │       └── ...
-└── cicy/                              # Complete Intersection CY models
-    └── cicy_7807/
-        ├── SUSY_Nmax20.parquet                    # curated
-        └── community/
-            └── ...
+├── cicy/                              # Complete Intersection CY models
+│   └── cicy_7807/
+│       ├── SUSY_Nmax20.parquet                    # curated
+│       └── community/
+│           └── ...
+└── local/                            # Local jaxvacua models (addressed by h12 + model_ID,
+    └── h12_2/                         #   not a cy-database id — see §2.1)
+        └── model_1/
+            ├── ISDplus_demo.parquet               # curated
+            └── community/
+                └── alice-hf_extra_ISDplus.parquet
 ```
 
 ### 2.1 Path semantics
 
 | Segment | Meaning |
 |---------|---------|
-| `tdf` / `cicy` | Source catalogue in the geometry repo (`aschachner/cy-database`). |
+| `tdf` / `cicy` | Model rooted in the geometry repo (`aschachner/cy-database`). |
+| `local` | Local **jaxvacua** model, addressed by its bundled-model index `(h12, model_ID)` rather than a `cy-database` id. |
 | `h12_{h12}` | Hodge number $h^{1,2}$ — fixes the dimension of the complex structure sector. |
 | `ks_{ks_id}_tri_{triang_id}` | KS polytope + triangulation index (TDF models). |
 | `cicy_{cicy_id}` | CICY configuration matrix index. |
+| `model_{model_ID}` | jaxvacua-internal model index (the `local/` namespace). |
 | **Curated files at model level** | Reviewed, canonical datasets. Downloaded by default. |
 | `community/` | Pending, unreviewed contributions. Filename prefixed with the contributor's HF username. |
 | `_rejected/` | (Opt-in, split-mode only.) Split-off rows that failed row-level validation. Excluded from default queries. |
@@ -126,7 +145,7 @@ filename.
 - **Curated files**: `{label}[_v{n}].parquet` where `{label}` matches
   the slug regex `^[A-Za-z0-9][A-Za-z0-9_-]*$`.
   e.g. `SUSY_Nmax34.parquet`, `racetrack_small_W0.parquet`,
-  `KKLT_candidates.parquet`, `nonSUSY_ISD-_Nmax200.parquet`.
+  `nonSUSY_ISD-_Nmax200.parquet`.
 - **Community files** (inside `community/`): `{hf_username}_{label}[_v{n}].parquet`
   e.g. `community/alice-hf_racetrack_candidates.parquet`.
 - **Rejected files** (inside `_rejected/`, split-mode):
@@ -184,6 +203,21 @@ machine-readable spec).
 | `is_susy` | `bool` | Whether $|DW| < 10^{-6}$. |
 | `is_minimum` | `bool` | Whether the Hessian is positive-definite. |
 | `V` | `float` | Scalar potential at the solution. |
+| `g_s` | `float` | String coupling $g_s = 1/\mathrm{Im}\,\tau$. |
+| `mass2` | `list<float>` | Sorted real scalar mass-squared spectrum — eigenvalues of the canonically-normalised no-scale mass matrix (sign-carrying; negative entries are tachyonic). **FluxEFT normalisation — see note.** |
+| `m_gravitino` | `float` | Gravitino mass $m_{3/2} = e^{K/2}\lvert W\rvert$. Same normalisation. |
+
+**Mass units.** `mass2` and `m_gravitino` are in the **FluxEFT no-scale
+normalisation, not** $M_{\mathrm{Pl}}$. At the flux-EFT level the overall
+Calabi–Yau (Einstein-frame) volume $\mathcal{V}_E$ — a function of the
+*Kähler* moduli — is not stabilised, so the FluxEFT Kähler potential omits
+the $-2\log\mathcal{V}_E$ term and both quantities carry an unfixed overall
+volume factor:
+$m^2_{\mathrm{phys}} = \mathcal{V}_E^{-2}\,$`mass2` and
+$m_{3/2,\mathrm{phys}} = \mathcal{V}_E^{-1}\,$`m_gravitino`. Only the
+dimensionless ratio $m/m_{3/2}$ (in which $\mathcal{V}_E$ cancels) is
+volume-independent and physical. These columns can be (re)computed from
+`flux` + stabilised moduli with `db.complete_missing(df, model=...)`.
 
 ### 3.3 Metadata / provenance columns
 
@@ -192,6 +226,7 @@ machine-readable spec).
 | `tags` | `string` (JSON array) | Free-form tags for filtering (e.g. `["SUSY", "ISD-", "Nmax200"]`). |
 | `extra_data` | `string` (JSON object) | Per-solution metadata (e.g. `{"moduli_max": 100, "solver": "hybrid"}`). |
 | `designated_id` | `int64` | Monotonic ID assigned on upload. |
+| `model_ID` | `int64` (nullable) | jaxvacua-internal model index for `local/` models (catalogue-derived from the path); `NULL` for `tdf` / `cicy`. |
 | `status` | `string` | Lifecycle state: `"pending"` (in `community/`), `"curated"` (at model level), `"rejected"` (split-mode failure), `"retracted"` (post-merge retraction). |
 | `original_contributor` | `string` | HF username of the original contributor, preserved when a community submission is curated and the filename prefix is stripped. |
 | `retracted` | `bool` | `True` if the entry has been retracted. |
@@ -226,27 +261,26 @@ version; additive changes bump a minor version.
 | **Contents** | CY geometries: intersection numbers, $c_2$, Kähler cone data, GV/GW invariants, conifold data | Flux vacuum solutions: fluxes, stabilised moduli, tadpole, classification |
 | **Update cadence** | Static / slow (append-only as new triangulations are added) | Fast (new solutions continuously produced) |
 | **Size** | Could reach millions of models | Grows with sampling effort per model |
-| **Key identifiers** | `(ks_id, triang_id)` for TDF, `cicy_id` for CICY | Same keys + `label` + `committed_by` |
+| **Key identifiers** | `(ks_id, triang_id)` for TDF, `cicy_id` for CICY | Same keys (plus `(h12, model_ID)` for local jaxvacua models) + `label` + `committed_by` |
 
 A row in `vacua_vault` is only meaningful relative to a row in `cy-database`:
 the flux vector lives in the integer lattice $H^3(Y, \mathbb{Z})$ defined by
 the model's period data. The recommended workflow is:
 
-1. Load the geometry via `jaxvacua.CYDatabase().load(ks_id=29, triang_id=0)`.
+1. Load the model via `stringforge.LCSDatabase(dataset="tdf").load_model(ks_id=29, triang_id=0)`.
 2. Load solutions via `db.fetch_vacua_from_hub(ks_id=29, triang_id=0, ...)`.
-3. Reconstruct the moduli physics using the loaded geometry + stored fluxes.
+3. Reconstruct the moduli physics using the loaded model + stored fluxes.
 
 ---
 
 ## 5. Using the dataset
 
-### 5.1 With `jaxvacua` (recommended)
+### 5.1 With `stringforge` (recommended)
 
 ```python
-import jaxvacua as jvc
-from jaxvacua.database import CYDatabase
+from stringforge import LCSDatabase
 
-db = CYDatabase()
+db = LCSDatabase(dataset="tdf")
 
 # Browse what's available
 catalog = db.list_hub_vacua(h12=2)
@@ -298,9 +332,9 @@ df_pending = pd.read_parquet(
 ### 5.3 Validating downloaded data
 
 ```python
-from jaxvacua.database import CYDatabase
-db = CYDatabase()
-model = db.load(ks_id=29, triang_id=0)
+from stringforge import LCSDatabase
+db = LCSDatabase(dataset="tdf")
+model = db.load_model(ks_id=29, triang_id=0)
 report = db.validate_vacua(df, model=model, F_term_tol=1e-6)
 ```
 
@@ -380,7 +414,7 @@ branch.
 - **Deduplicated.** Run `db.load_local_vacua(model=model)` locally and
   deduplicate against your existing solutions before pushing.
 - **Focused label.** One label per physical question
-  (e.g. `racetrack_small_W0`, `dS_candidates_KKLT`), not a generic dump.
+  (e.g. `racetrack_small_W0`, `nonSUSY_dS_candidates`), not a generic dump.
 - **Tagged.** Tags should describe filters a user might query on (mode, Nmax,
   solver type, post-selection criteria).
 - **Within tadpole bound.** All solutions must satisfy the D3-brane tadpole.
@@ -475,8 +509,8 @@ the parquet files in the repo.
 During PR CI (§7), after validation passes, a *preview* of the post-merge
 catalogue is computed and posted as a PR comment. Example:
 
-> *This PR adds 2 datasets (1,247 rows total) to
-> `tdf/h12_2/ks_00029_tri_0000/community/` and proposes 0 retractions.*
+*This PR adds 2 datasets (1,247 rows total) to
+`tdf/h12_2/ks_00029_tri_0000/community/` and proposes 0 retractions.*
 
 Reviewers see the impact at a glance before merging.
 
@@ -515,9 +549,11 @@ Users browsing the catalogue use `db.list_hub_vacua(...)` which reads
 
 - **Geometry catalogue:** [`aschachner/cy-database`](https://huggingface.co/datasets/aschachner/cy-database)
   — intersection numbers, $c_2$, Kähler cone, GV/GW invariants, conifold data.
-- **Code:** [`aschachner/jaxvacua`](https://github.com/aschachner/jaxvacua) —
-  Python package for flux vacuum generation, period integration,
-  post-selection, and database I/O.
+- **Code (database/vault I/O):** [`aschachner/stringforge`](https://github.com/aschachner/stringforge)
+  — `LCSDatabase`, the vault writer, and the server-side `vacuavault` validation /
+  catalogue tooling.
+- **Code (physics):** [`aschachner/jaxvacua`](https://github.com/aschachner/jaxvacua)
+  — flux vacuum generation, period integration, and post-selection.
 
 ---
 

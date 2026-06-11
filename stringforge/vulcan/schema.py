@@ -97,6 +97,11 @@ CERT_STATUSES: Tuple[str, ...] = ("certified", "provisional", "invalidated")
 OPTIONAL_COLUMNS: Tuple[str, ...] = (
     "h11", "h12", "ks_id", "triang_id", "conifold_id", "cicy_id",
     "W_re", "W_im", "F_terms_re", "F_terms_im",
+    # derived physics (output of VacuaWriter.complete_missing).  ``g_s`` and
+    # ``m_gravitino`` and the ``mass2`` spectrum are in the FluxEFT no-scale
+    # normalisation (NOT M_Pl -- the overall CY volume is unfixed at this
+    # level); see :func:`stringforge.vacua_writer._compute_derived`.
+    "g_s", "mass2", "m_gravitino",
     "residual", "n_iterations", "is_susy", "is_isd",
     "solver_name", "solver_config_hash",
     "git_sha", "seed", "wall_clock_s",
@@ -166,6 +171,9 @@ def pyarrow_schema(extra_columns: Optional[Mapping[str, pa.DataType]] = None) ->
         pa.field("W_im", pa.float64()),
         pa.field("F_terms_re", pa.list_(pa.float64())),
         pa.field("F_terms_im", pa.list_(pa.float64())),
+        pa.field("g_s", pa.float64()),
+        pa.field("mass2", pa.list_(pa.float64())),
+        pa.field("m_gravitino", pa.float64()),
         pa.field("residual", pa.float64()),
         pa.field("n_iterations", pa.int32()),
         pa.field("is_susy", pa.bool_()),

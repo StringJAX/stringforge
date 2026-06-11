@@ -294,6 +294,29 @@ def _decode_array(value: Any) -> Optional[np.ndarray]:
     return np.array(value)
 
 
+def _decode_invariants(value: Any) -> Optional[np.ndarray]:
+    r"""
+    **Description:**
+    Decode a GV/GW ``invariants`` column entry.  Like :func:`_decode_array`,
+    but additionally parses **decimal-string** encodings back to exact Python
+    ints: BPS invariants can exceed ``int64`` (which parquet cannot store), so
+    the KKLT GV split records them as strings.  Numeric (``int64`` / float)
+    encodings -- e.g. the TDF split -- pass through unchanged.
+
+    Returns an ``object``-dtype array of Python ints for the string case (so
+    arbitrary-precision values survive), otherwise the plain numeric array.
+    """
+    arr = _decode_array(value)
+    if arr is None:
+        return None
+    if arr.dtype.kind in ("U", "S", "O"):
+        try:
+            return np.array([int(x) for x in arr.tolist()], dtype=object)
+        except (TypeError, ValueError):
+            return arr
+    return arr
+
+
 def _parse_gv_row(row: Any) -> Dict[str, Any]:
     r"""
     **Description:**
@@ -313,11 +336,11 @@ def _parse_gv_row(row: Any) -> Dict[str, Any]:
     return {
         "GVs": {
             "charges":    _decode_array(row.get("gv_charges")),
-            "invariants": _decode_array(row.get("gv_invariants")),
+            "invariants": _decode_invariants(row.get("gv_invariants")),
         },
         "GWs": {
             "charges":    _decode_array(row.get("gw_charges")),
-            "invariants": _decode_array(row.get("gw_invariants")),
+            "invariants": _decode_invariants(row.get("gw_invariants")),
         },
         "grading_vector": _decode_array(row.get("grading_vector")),
     }

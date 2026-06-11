@@ -1163,6 +1163,7 @@ class LCSDatabase(CYDatabase):
     def fetch_vacua_from_hub(self, *args, **kwargs):return self._vw.fetch_vacua_from_hub(*args, **kwargs)
     def list_hub_vacua(self, *args, **kwargs):      return self._vw.list_hub_vacua(*args, **kwargs)
     def validate_vacua(self, *args, **kwargs):      return self._vw.validate_vacua(*args, **kwargs)
+    def complete_missing(self, *args, **kwargs):    return self._vw.complete_missing(*args, **kwargs)
     def delete_vacua(self, *args, **kwargs):        return self._vw.delete_vacua(*args, **kwargs)
     def vacua_writer(self, *args, **kwargs):        return self._vw.vacua_writer(*args, **kwargs)
     def designated_info(self, *args, **kwargs):     return self._vw.designated_info(*args, **kwargs)

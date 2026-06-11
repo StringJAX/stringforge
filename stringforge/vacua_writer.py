@@ -376,6 +376,284 @@ def _vacua_rows_from_batch(
     return rows
 
 
+def _is_missing(v: Any) -> bool:
+    r"""True if a DataFrame cell is absent (``None`` / ``NaN``).  List- and
+    array-valued cells (``flux``, ``F_terms_*``, ``mass2``) always count as
+    present (``pd.isna`` on them is ambiguous)."""
+    if v is None:
+        return True
+    try:
+        res = _require_pandas().isna(v)
+    except (ValueError, TypeError):
+        return False
+    return bool(res) if np.ndim(res) == 0 else False
+
+
+def _mass2_from_matrix(MM: Any) -> list:
+    r"""Sorted (ascending) real mass-squared spectrum from the canonically
+    normalised mass matrix.  For a valid vacuum the matrix is Hermitian, so the
+    eigenvalues are real; the real part is taken to drop numerical noise."""
+    return [float(x) for x in np.sort(np.linalg.eigvals(np.asarray(MM)).real)]
+
+
+def _masses_one(model: Any, z: Any, t: complex, fl: Any, W: Any = None):
+    r"""``(mass2, m_gravitino)`` for a single vacuum, or ``(None, None)`` if the
+    model call fails.  Kept separate so the loop and the vmap path share the
+    same mass computation (the eigendecomposition runs on the host)."""
+    try:
+        zc = np.conj(z); tc = np.conj(t)
+        mass2 = _mass2_from_matrix(model.mass_matrix(
+            z, zc, t, tc, fl, mode=None, noscale=True))
+        KP = float(np.real(model.kahler_potential(z, zc, t, tc)))
+        if W is None:
+            W = complex(model.superpotential(z, t, fl))
+        return mass2, float(np.exp(KP / 2.0) * abs(W))
+    except Exception:
+        return None, None
+
+
+def _derived_loop(model: Any, moduli: list, tau: list, flux: list,
+                  with_masses: bool):
+    r"""Per-row evaluation of ``W``, ``DW``, ``N_flux`` and (optionally) the
+    mass spectrum + gravitino mass.  Returns five length-``n`` lists; a row
+    whose model call raises is left as ``None`` in every output.  This is the
+    default path -- it re-uses the model's own cached ``jit``, so it is fast
+    and is the only path that works for non-jax models."""
+    n = len(moduli)
+    W = [None] * n; DW = [None] * n; Nflux = [None] * n
+    mass2 = [None] * n; mgrav = [None] * n
+    for i in range(n):
+        try:
+            z = moduli[i]; t = complex(tau[i]); fl = np.asarray(flux[i])
+            zc = np.conj(z); tc = np.conj(t)
+            Nflux[i] = float(np.real(model.tadpole(fl)))
+            W[i] = complex(model.superpotential(z, t, fl))
+            DW[i] = np.asarray(model.DW(z, zc, t, tc, fl), dtype=np.complex128)
+        except Exception:
+            continue
+        if with_masses:
+            mass2[i], mgrav[i] = _masses_one(model, z, t, fl, W[i])
+    return W, DW, Nflux, mass2, mgrav
+
+
+def _derived_vmap(model: Any, moduli: list, tau: list, flux: list,
+                  vmap_dim: int, with_masses: bool):
+    r"""Vectorised evaluation of ``W`` / ``DW`` / ``N_flux``: a single
+    ``jax.jit(jax.vmap(...))`` kernel computes them for a whole batch on the
+    accelerator.  Batches are padded to a constant ``vmap_dim`` so the kernel
+    compiles once and is re-used, amortising the compilation over a large
+    table; a batch that raises (e.g. a non-jax model) falls back to
+    :func:`_derived_loop`.
+
+    The mass spectrum + gravitino mass are computed per row (the
+    eigendecomposition stays on the host).  ``vmap_dim`` is opt-in: it pays off
+    only for large tables, since for small ones the per-row loop already re-uses
+    the model's cached ``jit``."""
+    import jax
+    import jax.numpy as jnp
+
+    n = len(moduli)
+    Zall = jnp.asarray(np.stack([np.asarray(z) for z in moduli]))
+    Tall = jnp.asarray(np.asarray(tau, dtype=np.complex128))
+    Fall = jnp.asarray(np.stack([np.asarray(f) for f in flux]))
+
+    def _cheap(z, t, fl):
+        zc = jnp.conj(z); tc = jnp.conj(t)
+        return (model.superpotential(z, t, fl),
+                model.DW(z, zc, t, tc, fl),
+                jnp.real(model.tadpole(fl)))
+
+    fn = jax.jit(jax.vmap(_cheap))
+
+    W = [None] * n; DW = [None] * n; Nflux = [None] * n
+    mass2 = [None] * n; mgrav = [None] * n
+    bs = max(1, int(vmap_dim))
+    for s in range(0, n, bs):
+        e = min(s + bs, n)
+        zb, tb, fb = Zall[s:e], Tall[s:e], Fall[s:e]
+        pad = bs - (e - s)
+        if pad:  # pad to a constant batch size so the kernel compiles once
+            zb = jnp.concatenate([zb, jnp.broadcast_to(zb[-1:], (pad,) + zb.shape[1:])], 0)
+            tb = jnp.concatenate([tb, jnp.broadcast_to(tb[-1:], (pad,))], 0)
+            fb = jnp.concatenate([fb, jnp.broadcast_to(fb[-1:], (pad,) + fb.shape[1:])], 0)
+        try:
+            Wb, DWb, Nfb = fn(zb, tb, fb)
+            Wb = np.asarray(Wb); DWb = np.asarray(DWb); Nfb = np.asarray(Nfb).real
+            for j in range(e - s):
+                idx = s + j
+                W[idx] = complex(Wb[j]); DW[idx] = DWb[j]; Nflux[idx] = float(Nfb[j])
+        except Exception:
+            wB, dB, nB, _, _ = _derived_loop(
+                model, moduli[s:e], tau[s:e], flux[s:e], False)
+            W[s:e], DW[s:e], Nflux[s:e] = wB, dB, nB
+
+    if with_masses:  # per row (eigendecomposition on the host)
+        for i in range(n):
+            if W[i] is None:
+                continue
+            z = moduli[i]; t = complex(tau[i]); fl = np.asarray(flux[i])
+            mass2[i], mgrav[i] = _masses_one(model, z, t, fl, W[i])
+    return W, DW, Nflux, mass2, mgrav
+
+
+def _compute_derived(
+    df: Any,
+    model: Any,
+    fill_missing_only: bool = False,
+    with_masses: bool = False,
+    vmap_dim: Optional[int] = None,
+    enrich: bool = False,
+) -> Any:
+    r"""
+    **Description:**
+    Complete a per-vacuum table: starting from *df* (all input columns are
+    preserved), fill in the derived quantities computed from *model* and --
+    when *enrich* is set -- back-fill the standard identity / convenience
+    columns, so the result carries the same schema as :meth:`query_vacua` /
+    :meth:`load_vacua` with every column populated.
+
+    Derived physics: superpotential ``W_re``/``W_im``, F-terms
+    ``F_terms_re``/``F_terms_im``, tadpole ``N_flux``, ``is_susy``, the string
+    coupling ``g_s`` (:math:`= 1/\mathrm{Im}\,\tau`), and -- when *with_masses*
+    -- the scalar mass spectrum ``mass2`` and the gravitino mass
+    ``m_gravitino``.  Backfilled columns: the complex ``moduli`` / ``tau``
+    convenience columns and the model-identity columns ``h11``, ``h12``,
+    ``ks_id``, ``triang_id``, ``conifold_id``, ``cicy_id``, ``model_hash``,
+    ``model_name`` (constant for a given *model*).
+
+    The mass spectrum ``mass2`` is the sorted list of real eigenvalues of the
+    canonically-normalised mass matrix of the **no-scale** scalar potential
+    (:func:`FluxEFT.mass_matrix` with ``mode=None, noscale=True``);
+    sign-carrying (negative entries are tachyonic).  ``m_gravitino`` is
+    :math:`m_{3/2}=e^{K/2}|W|`.
+
+    .. warning::
+        ``mass2`` and ``m_gravitino`` are in the **FluxEFT no-scale
+        normalisation, NOT in** :math:`M_\mathrm{Pl}`.  The FluxEFT Kähler
+        potential :math:`K=-\log[-i(\tau-\bar\tau)]-\log\mathcal{A}(z,\bar z)`
+        omits the :math:`-2\log\mathcal{V}_E` term, because the overall CY
+        (Einstein-frame) volume :math:`\mathcal{V}_E` -- a function of the
+        Kähler moduli -- is not stabilised at this level.  The physical values
+        therefore carry an unfixed overall volume factor,
+        :math:`m^2_\mathrm{phys}=\mathcal{V}_E^{-2}\times` ``mass2`` and
+        :math:`m_{3/2,\mathrm{phys}}=\mathcal{V}_E^{-1}\times`
+        ``m_gravitino``.  Only the **ratio** :math:`m/m_{3/2}` (in which
+        :math:`\mathcal{V}_E` cancels) is volume-independent and physical.
+
+    Args:
+        df:    DataFrame with at least ``flux``, ``moduli_re``,
+               ``moduli_im``, ``tau_re``, ``tau_im``.  Tables without those
+               columns (e.g. a run-level catalog) are returned unchanged.
+        model: A JAXVacua ``FluxEFT`` / ``FluxVacuaFinder`` model.
+        fill_missing_only (bool): if ``True``, only populate cells that are
+            currently ``None`` / ``NaN`` (idempotent autocomplete); existing
+            values are left untouched.  If ``False`` (default), ``W``, the
+            F-terms and ``is_susy`` are recomputed unconditionally.
+        with_masses (bool): if ``True``, also compute ``mass2`` and
+            ``m_gravitino``.  Off by default because the mass matrix costs an
+            :math:`O((h^{1,2}+1)^3)` eigendecomposition per row.
+        vmap_dim (int | None): if set, evaluate ``W`` / ``DW`` / ``N_flux``
+            (and the masses) with :func:`jax.vmap` in batches of this many
+            rows instead of a Python loop -- much faster for large tables.
+            ``None`` (default) keeps the per-row path (also the only path that
+            works for non-jax models).
+        enrich (bool): if ``True``, also add the complex ``moduli`` / ``tau``
+            columns and back-fill the model-identity columns (``h11``,
+            ``h12``, ``ks_id``, ...).  Off by default because those complex
+            columns cannot be serialised to parquet; :meth:`complete_missing`
+            sets it for in-memory completion.
+
+    Returns:
+        pandas.DataFrame: *df* with the derived + backfilled columns populated.
+    """
+    pd = _require_pandas()
+    out = df.copy()
+    n = len(out)
+    if n == 0:
+        return out
+
+    # Per-vacuum inputs.  If absent (e.g. a run-level catalog without a
+    # ``flux`` column) there is nothing to complete -- return df unchanged.
+    try:
+        moduli = [np.asarray(out["moduli_re"].iloc[i], dtype=float)
+                  + 1j * np.asarray(out["moduli_im"].iloc[i], dtype=float)
+                  for i in range(n)]
+        tau    = [complex(out["tau_re"].iloc[i]) + 1j * complex(out["tau_im"].iloc[i])
+                  for i in range(n)]
+        flux   = [np.asarray(out["flux"].iloc[i]) for i in range(n)]
+    except (KeyError, TypeError, ValueError):
+        return out
+
+    def _fill(col: str, values: list) -> None:
+        """Assign *values* (length n, positional) into *col*, honouring
+        fill_missing_only.  Scalar columns keep their natural (numeric) dtype;
+        list-valued columns (F_terms, mass2) are stored as object so pandas
+        does not try to broadcast them."""
+        if fill_missing_only and col in out.columns:
+            cur = list(out[col])
+            values = [values[i] if _is_missing(cur[i]) else cur[i]
+                      for i in range(n)]
+        listlike = any(isinstance(v, (list, tuple, np.ndarray)) for v in values)
+        out[col] = pd.Series(values, index=out.index,
+                             dtype=object if listlike else None)
+
+    # Identity + convenience-column back-fill (``enrich``).  Off by default
+    # because the complex ``moduli`` / ``tau`` columns cannot be serialised to
+    # parquet -- this path is only for in-memory results (``complete_missing``).
+    # query_vacua / load_vacua already carry these columns, so a written shard
+    # never needs them.
+    if enrich:
+        # Convenience complex columns (parity with query_vacua / load_vacua).
+        if "moduli" not in out.columns:
+            out["moduli"] = pd.Series(moduli, index=out.index, dtype=object)
+        if "tau" not in out.columns:
+            out["tau"] = pd.Series(tau, index=out.index, dtype=object)
+
+        # Model-identity columns (constant per model; skipped if the model has
+        # no extractable identity, e.g. a bare test stub).
+        try:
+            ident = _extract_model_identity(model=model)
+        except Exception:
+            ident = {}
+        for k in ("h11", "h12", "ks_id", "triang_id", "conifold_id",
+                  "cicy_id", "model_hash", "model_name"):
+            if k not in ident:
+                continue
+            if k not in out.columns:
+                out[k] = ident[k]
+            elif fill_missing_only:
+                cur = list(out[k])
+                out[k] = [cur[i] if not _is_missing(cur[i]) else ident[k]
+                          for i in range(n)]
+
+    # String coupling g_s = 1 / Im(tau).
+    _fill("g_s", [(1.0 / float(np.imag(tau[i])))
+                  if np.imag(tau[i]) != 0.0 else None for i in range(n)])
+
+    # Physics: vmapped batches or per-row.
+    if vmap_dim:
+        W, DW, Nflux, mass2, mgrav = _derived_vmap(
+            model, moduli, tau, flux, int(vmap_dim), with_masses)
+    else:
+        W, DW, Nflux, mass2, mgrav = _derived_loop(
+            model, moduli, tau, flux, with_masses)
+
+    _fill("N_flux", [None if x is None else float(x) for x in Nflux])
+    _fill("W_re",   [None if w is None else float(np.real(w)) for w in W])
+    _fill("W_im",   [None if w is None else float(np.imag(w)) for w in W])
+    _fill("F_terms_re",
+          [None if d is None else np.asarray(d).real.tolist() for d in DW])
+    _fill("F_terms_im",
+          [None if d is None else np.asarray(d).imag.tolist() for d in DW])
+    _fill("is_susy",
+          [None if d is None else bool(np.max(np.abs(np.asarray(d))) < 1e-6)
+           for d in DW])
+    if with_masses:
+        _fill("mass2", mass2)
+        _fill("m_gravitino", [None if x is None else float(x) for x in mgrav])
+    return out
+
+
 class _VacuaStreamWriter:
     r"""
     Context manager for buffered writing of vacuum solutions to local parquet
@@ -689,43 +967,12 @@ class _VacuaStreamWriter:
         catalog.to_parquet(catalog_path, index=False)
 
     def _compute_derived_quantities(self, df: Any) -> Any:
-        r"""Compute W, DW, N_flux for all rows in df using self._model."""
-        model = self._model
-        rows_updated = []
-        for _, row in df.iterrows():
-            row = dict(row)
-            flux = np.array(row["flux"], dtype=np.int32)
-            moduli = np.array(row["moduli_re"]) + 1j * np.array(row["moduli_im"])
-            tau = row["tau_re"] + 1j * row["tau_im"]
-
-            try:
-                # Tadpole
-                if row.get("N_flux") is None:
-                    row["N_flux"] = float(model.tadpole(flux))
-
-                # Superpotential
-                W = complex(model.superpotential(moduli, tau, flux))
-                row["W_re"] = W.real
-                row["W_im"] = W.imag
-
-                # F-terms
-                moduli_c = np.conj(moduli)
-                tau_c = np.conj(tau)
-                DW = np.asarray(model.DW(moduli, moduli_c, tau, tau_c, flux),
-                                dtype=np.complex128)
-                row["F_terms_re"] = DW.real.tolist()
-                row["F_terms_im"] = DW.imag.tolist()
-
-                # is_susy: check if all F-terms are small
-                if not row.get("is_susy"):
-                    row["is_susy"] = bool(np.max(np.abs(DW)) < 1e-6)
-            except Exception:
-                pass  # leave derived fields as None if computation fails
-
-            rows_updated.append(row)
-
-        pd = _require_pandas()
-        return pd.DataFrame(rows_updated)
+        r"""Compute W, DW, N_flux (and ``g_s``) for all rows in *df* using
+        ``self._model``.  Thin wrapper around the module-level
+        :func:`_compute_derived` (masses are not computed at session-flush
+        time -- they are added on designation / via
+        :meth:`VacuaWriter.complete_missing`)."""
+        return _compute_derived(df, self._model)
 
 
 
@@ -1557,7 +1804,8 @@ class VacuaWriter:
 
         The upload lands inside the target model's ``community/``
         directory: ``tdf/h12_{N}/ks_{X}_tri_{Y}/community/{hf_username}_{label}.parquet``
-        (or the analogous CICY path).  Filesystem-free-form labels
+        (or the analogous CICY ``cicy/cicy_{X}/…`` or local-model
+        ``local/h12_{N}/model_{M}/…`` path).  Filesystem-free-form labels
         (see §5.6 of the vacua-storage plan) mean classification
         (``susy``, ``method``, ``nmax``, ``qualifiers``) is stored as
         parquet-level key-value metadata and extracted by the remote
@@ -2022,6 +2270,16 @@ class VacuaWriter:
             return f"tdf/h12_{h12}/ks_{ks}_tri_{tr}"
         if cic >= 0:
             return f"cicy/cicy_{cic}"
+        # Local JAXVacua models (loaded via h12 + model_ID) carry no
+        # ks/triang/cicy id; ``_extract_model_identity`` assigns them a
+        # synthetic name ``local_h12_{h12}_ID_{model_ID}``.  They live in a
+        # dedicated remote ``local/`` namespace (nested to match the
+        # ``tdf/``/``cicy/`` two-level convention; the on-disk store uses the
+        # flat ``KS/h12_{h12}_model_{model_ID}`` dir, see ``_resolve_vacua_dir``).
+        name = identity.get("model_name") or ""
+        if name.startswith("local_h12_") and "_ID_" in name and h12 is not None:
+            mid = name.rsplit("_ID_", 1)[-1]
+            return f"local/h12_{h12}/model_{mid}"
         return None
     @staticmethod
     def _resolve_remote_filename(
@@ -2072,6 +2330,63 @@ class VacuaWriter:
         while f"{base_stem}_v{n}{ext}" in files:
             n += 1
         return f"{base_stem}_v{n}{ext}"
+    def complete_missing(
+        self,
+        df: Any,
+        model: Any,
+        with_masses: bool = True,
+        vmap_dim: Optional[int] = None,
+    ) -> Any:
+        r"""
+        **Description:**
+        Return *df* completed to the full per-vacuum schema: every input
+        column is preserved, the derived physics is filled in, and the
+        standard identity / convenience columns are back-filled from *model*,
+        so the result carries the same columns as :meth:`query_vacua` /
+        :meth:`load_vacua` with everything populated.  Only cells that are
+        currently ``None`` / ``NaN`` are touched (idempotent), so it is safe
+        on freshly-queried session vacua *or* on loaded designated vacua
+        (which are stored with a reduced column set).
+
+        Fields completed: superpotential ``W_re``/``W_im``, F-terms
+        ``F_terms_re``/``F_terms_im``, tadpole ``N_flux``, ``is_susy``, string
+        coupling ``g_s`` (:math:`= 1/\mathrm{Im}\,\tau`), the complex
+        ``moduli`` / ``tau`` columns, the identity columns (``h11``, ``h12``,
+        ``ks_id``, ``triang_id``, ``conifold_id``, ``cicy_id``,
+        ``model_hash``, ``model_name``) and -- when *with_masses* -- the mass
+        spectrum ``mass2`` (sorted real mass-squared eigenvalues of the
+        canonically-normalised no-scale mass matrix, sign-carrying) and the
+        gravitino mass ``m_gravitino`` (:math:`m_{3/2}=e^{K/2}|W|`).
+        ``mass2`` and ``m_gravitino`` are in the **FluxEFT no-scale
+        normalisation, not** :math:`M_\mathrm{Pl}` -- they carry an unfixed
+        overall CY-volume factor (only the ratio :math:`m/m_{3/2}` is
+        volume-independent).  See :func:`_compute_derived` for the exact
+        conventions.
+
+        Args:
+            df: DataFrame with at least ``flux``, ``moduli_re``,
+                ``moduli_im``, ``tau_re``, ``tau_im`` (e.g. from
+                :meth:`load_vacua` or :meth:`load_designated`).
+            model: JAXVacua model whose geometry the rows belong to
+                (required -- the writer does not hold a model).
+            with_masses (bool): also compute the mass spectrum and
+                gravitino mass.  Defaults to ``True``.
+            vmap_dim (int | None): if set, evaluate the physics with
+                :func:`jax.vmap` in batches of this many rows (much faster
+                for large tables).  ``None`` (default) uses the per-row path.
+
+        Returns:
+            pandas.DataFrame: the frame completed to the full schema.
+        """
+        if model is None:
+            raise ValueError(
+                "complete_missing requires a model to compute derived "
+                "quantities (pass model=...)."
+            )
+        return _compute_derived(
+            df, model, fill_missing_only=True, with_masses=with_masses,
+            vmap_dim=vmap_dim, enrich=True,
+        )
     def designate_vacua(
         self,
         vacua_df: Any,
@@ -2090,6 +2405,7 @@ class VacuaWriter:
         validate: bool = True,
         force: bool = False,
         F_term_tol: float = 1e-8,
+        vmap_dim: Optional[int] = None,
     ) -> List[int]:
         r"""
         **Description:**
@@ -2164,6 +2480,17 @@ class VacuaWriter:
 
         if len(vacua_df) == 0:
             return []
+
+        # Compute derived quantities -- including the mass spectrum (mass2)
+        # and gravitino mass (m_gravitino), in the FluxEFT no-scale
+        # normalisation (NOT M_Pl: the overall CY volume is unfixed here) --
+        # so the permanent designated records carry them.  Missing-only, so
+        # values already on the rows are preserved.
+        if model is not None:
+            vacua_df = _compute_derived(
+                vacua_df, model, fill_missing_only=True, with_masses=True,
+                vmap_dim=vmap_dim,
+            )
 
         # Normalise tags
         if tags is None:
@@ -2260,6 +2587,9 @@ class VacuaWriter:
                     "F_terms_re":    row.get("F_terms_re"),
                     "F_terms_im":    row.get("F_terms_im"),
                     "N_flux":        row.get("N_flux"),
+                    "g_s":           row.get("g_s"),
+                    "mass2":    row.get("mass2"),
+                    "m_gravitino": row.get("m_gravitino"),
                     "residual":      row.get("residual"),
                     "is_susy":       bool(row.get("is_susy", False)),
                     "tags":          json.dumps(merged_tags),

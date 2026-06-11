@@ -21,7 +21,7 @@ from .schema import SCHEMA_VERSION, RESERVED_NAMES
 #: Columns in the regenerated catalog.
 CATALOG_COLUMNS = (
     "file_path", "basename", "status",
-    "h12", "ks_id", "triang_id", "cicy_id",
+    "h12", "ks_id", "triang_id", "cicy_id", "model_ID",
     "susy", "method", "nmax", "qualifiers",
     "classification_source",
     "label", "version", "committed_by",
@@ -51,6 +51,7 @@ def _parse_path(repo_root: Path, p: Path) -> Dict[str, Any]:
         "ks_id":     None,
         "triang_id": None,
         "cicy_id":   None,
+        "model_ID":  None,
         "status":    "curated",
         "label":     None,
         "version":   1,
@@ -79,6 +80,23 @@ def _parse_path(repo_root: Path, p: Path) -> Dict[str, Any]:
         rest = parts[2:]
         if rest and rest[0] == "community":
             info["status"] = "pending"
+            rest = rest[1:]
+    # local/h12_N/model_M/[community/_rejected/]<name>.parquet
+    # (local JAXVacua models loaded via h12 + model_ID; the on-disk vault
+    # uses a flat KS/h12_N_model_M dir, the remote vault this nested layout.)
+    elif len(parts) >= 4 and parts[0] == "local":
+        m = re.match(r"h12_(\d+)", parts[1])
+        if m:
+            info["h12"] = int(m.group(1))
+        m = re.match(r"model_(\d+)", parts[2])
+        if m:
+            info["model_ID"] = int(m.group(1))
+        rest = parts[3:]
+        if rest and rest[0] == "community":
+            info["status"] = "pending"
+            rest = rest[1:]
+        if rest and rest[0] == "_rejected":
+            info["status"] = "rejected"
             rest = rest[1:]
     # Parse label + optional _v{n}
     stem = os.path.splitext(p.name)[0]

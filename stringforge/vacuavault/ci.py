@@ -64,8 +64,9 @@ def validate_pr_diff(
         report_path: Where to write ``validation_report.json``.
         catalog_preview_path: Where to write the Markdown preview
             posted as a PR comment.
-        model_loader: Optional callable ``(ks_id, triang_id, cicy_id)
-            → model`` for F-term physics checks.  When omitted, only
+        model_loader: Optional callable accepting ``(ks_id, triang_id)``,
+            ``(cicy_id)``, or ``(h12, model_ID)`` (for ``local/`` models)
+            → model, used for F-term physics checks.  When omitted, only
             schema/structural checks are performed.
         verbose: Print progress.
 
@@ -102,6 +103,16 @@ def validate_pr_diff(
                     m = re.match(r"cicy_(\d+)", parts[1])
                     if m:
                         model = model_loader(cicy_id=int(m.group(1)))
+                elif parts[0] == "local":
+                    # local/h12_N/model_M/... → load by (h12, model_ID)
+                    import re
+                    mh = re.match(r"h12_(\d+)", parts[1])
+                    mm = re.match(r"model_(\d+)", parts[2])
+                    if mh and mm:
+                        model = model_loader(
+                            h12=int(mh.group(1)),
+                            model_ID=int(mm.group(1)),
+                        )
             except Exception as e:
                 if verbose:
                     print(f"[ci] model_loader failed for {rel}: {e}")

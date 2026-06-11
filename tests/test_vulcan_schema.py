@@ -209,3 +209,25 @@ def test_validate_schema_warns_on_lone_unknown_column():
         _w.simplefilter("always")
         validate_schema(df)  # must not raise
     assert any("unknown columns" in str(w.message) for w in caught)
+
+
+def test_validate_schema_accepts_derived_mass_columns():
+    """``g_s`` / ``mass2`` / ``m_gravitino`` (output of
+    ``VacuaWriter.complete_missing``) are declared optionals -- a shard
+    carrying them must NOT trigger the unknown-columns warning."""
+    df = _make_valid_df()
+    df["g_s"] = [0.25] * len(df)
+    df["mass2"] = [[1.0, 4.0, 9.0]] * len(df)
+    df["m_gravitino"] = [0.7] * len(df)
+    import warnings as _w
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        validate_schema(df)  # must not raise
+    assert not any("unknown columns" in str(w.message) for w in caught)
+
+
+def test_pyarrow_schema_includes_mass_columns():
+    sch = pyarrow_schema()
+    assert sch.field("g_s").type == pa.float64()
+    assert sch.field("mass2").type == pa.list_(pa.float64())
+    assert sch.field("m_gravitino").type == pa.float64()
