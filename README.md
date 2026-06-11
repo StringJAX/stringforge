@@ -1,5 +1,13 @@
 # StringForge
 
+<p align="center">
+    <a href="https://stringforge.readthedocs.io"><img src="https://readthedocs.org/projects/stringforge/badge/?version=latest" alt="Docs"/></a>
+    <a href="https://pypi.org/project/stringforge/"><img src="https://img.shields.io/pypi/v/stringforge.svg" alt="StringForge"/></a>
+    <a href="https://www.python.org"><img src="https://img.shields.io/badge/python-3.12%2B-blue.svg" alt="Python"/></a>
+    <a href="https://github.com/StringJAX/stringforge/actions/workflows/ci.yml"><img src="https://github.com/StringJAX/stringforge/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+    <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3"/></a>
+</p>
+
 **Shared database, model-loading, and vacua-vault infrastructure for string-compactification workflows.**
 
 StringForge is the infrastructure layer for the [StringJAX](https://github.com/AndreasSchachner/stringjax) ecosystem of JAX-based string-compactification packages. It provides reproducible access to Calabi-Yau geometry databases, bridges those data into physics engines such as [JAXVacua](https://github.com/AndreasSchachner/jaxvacua), and manages persistent vacuum-solution storage with provenance.

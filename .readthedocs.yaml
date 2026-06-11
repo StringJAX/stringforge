@@ -18,11 +18,12 @@ formats:
   - htmlzip
   - pdf
 
-# Install only the documentation toolchain.  We do NOT `pip install .`:
-# stringforge depends (transitively, via jaxvacua) on cytools / gurobipy /
-# python-flint, which are not installable on Read the Docs and would hard-fail
-# the build.  `documentation/source/conf.py` prepends the repo root to
-# `sys.path` so stringforge is importable from source for autodoc.
+# Install the doc toolchain (documentation/requirements.txt -- which pins
+# `platformdirs` ahead of the cytools install pulled in via jaxvacua) and then
+# stringforge itself, so autodoc can import the package and its deps (all on
+# PyPI: jaxpolylog, jaxvacua, cytools, ...).
 python:
   install:
     - requirements: documentation/requirements.txt
+    - method: pip
+      path: .

@@ -1,4 +1,7 @@
 tqdm
+# platformdirs: undeclared transitive dep of the cytools wheel (pulled in via
+# jaxvacua); pin it before `pip install .` so autodoc can import on RTD.
+platformdirs
 Sphinx
 sphinx-book-theme
 sphinx-copybutton
