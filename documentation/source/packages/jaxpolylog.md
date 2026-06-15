@@ -2,7 +2,7 @@
 
 **JAX-compatible polylogarithm functions with automatic differentiation.**
 
-> **Source:** <https://github.com/AndreasSchachner/jaxpolylog>
+> **Source:** <https://github.com/StringJAX/jaxpolylog>
 > &nbsp;&nbsp;|&nbsp;&nbsp; **Documentation:** <https://jaxpolylog.readthedocs.io>
 > &nbsp;&nbsp;|&nbsp;&nbsp; **PyPI:** <https://pypi.org/project/jaxpolylog/>
 
@@ -53,7 +53,7 @@ dLi3_dz = jax.grad(lambda x: jax_polylog(x, s=3, p_range=20, approx="patch").rea
 
 ## Links
 
-- **Source:** <https://github.com/AndreasSchachner/jaxpolylog>
+- **Source:** <https://github.com/StringJAX/jaxpolylog>
 - **Documentation:** <https://jaxpolylog.readthedocs.io>
 - **PyPI:** <https://pypi.org/project/jaxpolylog/>
 - **Reference:** the [JAXVacua framework paper](https://arxiv.org/abs/2306.06160)

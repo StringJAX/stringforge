@@ -106,7 +106,7 @@ html_css_files = ["css/stringforge-figures.css"]
 html_title = "StringForge"
 
 html_theme_options = {
-    "repository_url": "https://github.com/AndreasSchachner/stringforge",
+    "repository_url": "https://github.com/StringJAX/stringforge",
     "repository_branch": "main",
     "path_to_docs": "documentation/source",
     "use_repository_button": True,

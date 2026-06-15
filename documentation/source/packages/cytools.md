@@ -1,11 +1,11 @@
 # CYTools
 
-**Toric Calabi–Yau geometry library — external dependency, not part of the
+**Toric Calabi-Yau geometry library — external dependency, not part of the
 StringForge umbrella.**
 
 [CYTools](https://cy.tools) is the upstream geometry library on which the
 StringForge ecosystem builds. It provides numerical tools for working with toric
-varieties, lattice polytopes, triangulations, and Calabi–Yau hypersurfaces /
+varieties, lattice polytopes, triangulations, and Calabi-Yau hypersurfaces /
 complete intersections derived from them. Within the ecosystem, CYTools is the
 canonical input layer: most pipelines start from a `cytools.Polytope` or
 `cytools.calabiyau.CalabiYau`.

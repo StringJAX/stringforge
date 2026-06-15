@@ -8,10 +8,10 @@ title: "StringForge: shared infrastructure for string-compactification workflows
 authors:
   - family-names: Schachner
     given-names: Andreas
-version: 0.1.0
+version: 0.1.1
 date-released: 2026-05-25
 license: GPL-3.0-only
-repository-code: "https://github.com/AndreasSchachner/stringforge"
+repository-code: "https://github.com/StringJAX/stringforge"
 abstract: >-
   StringForge provides database access, cache/offline workflows,
   model-loading bridges into physics engines such as JAXVacua, and persistent

@@ -42,6 +42,6 @@ The full module-by-module breakdown lives in [the architecture page](../ecosyste
 ## Links
 
 - **Full documentation:** <https://jaxvacua.readthedocs.io/en/latest/>
-- **Source:** <https://github.com/AndreasSchachner/jaxvacua>
+- **Source:** <https://github.com/StringJAX/jaxvacua>
 - **Reference paper:** [arXiv:2306.06160](https://arxiv.org/abs/2306.06160)
   (Dubey, Krippendorf, Schachner — JHEP 12 (2023) 146)

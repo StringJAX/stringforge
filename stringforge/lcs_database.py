@@ -489,7 +489,7 @@ class LCSDatabase(CYDatabase):
         if h11 == 0 or h12 == 0:
             warnings.warn(
                 "One of the Hodge numbers is zero, which may lead to "
-                "unexpected behavior in some JAXVacua computations. "
+                "unexpected behaviour in some JAXVacua computations. "
                 "Proceed with caution."
             )
         

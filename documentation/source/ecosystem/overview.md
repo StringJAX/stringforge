@@ -13,7 +13,7 @@ data interfaces, but their computations live in their own packages.
 | Package | Role | Status | Reference |
 | --- | --- | --- | --- |
 | [`jaxvacua`](../packages/jaxvacua) | Type IIB flux vacua: complex-structure sector, vacuum finding, stability analysis. | Public | [arXiv:2306.06160](https://arxiv.org/abs/2306.06160) |
-| [`jaxpolylog`](../packages/jaxpolylog) &mdash; [GitHub](https://github.com/AndreasSchachner/jaxpolylog) &nbsp;[docs](https://jaxpolylog.readthedocs.io) | JAX-compatible polylogarithm functions with autodiff support. | Public | -- |
+| [`jaxpolylog`](../packages/jaxpolylog) &mdash; [GitHub](https://github.com/StringJAX/jaxpolylog) &nbsp;[docs](https://jaxpolylog.readthedocs.io) | JAX-compatible polylogarithm functions with autodiff support. | Public | -- |
 | [`kahlerjax`](../packages/kahlerjax) | Planned Kähler-moduli stabilisation package. | Planned; API not stable | [arXiv:2507.00615](https://arxiv.org/abs/2507.00615) |
 | [`jaxiverse`](../packages/jaxiverse) | Planned multi-axion EFT package. | Planned; API not stable | -- |
 | [`cytools`](../packages/cytools) | External toric Calabi-Yau geometry library. | Public external dependency | [arXiv:2211.03823](https://arxiv.org/abs/2211.03823) |

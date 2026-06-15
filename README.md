@@ -10,7 +10,7 @@
 
 **Shared database, model-loading, and vacua-vault infrastructure for string-compactification workflows.**
 
-StringForge is the infrastructure layer for the [StringJAX](https://github.com/AndreasSchachner/stringjax) ecosystem of JAX-based string-compactification packages. It provides reproducible access to Calabi-Yau geometry databases, bridges those data into physics engines such as [JAXVacua](https://github.com/AndreasSchachner/jaxvacua), and manages persistent vacuum-solution storage with provenance.
+StringForge is the infrastructure layer for the [StringJAX](https://github.com/StringJAX/stringjax) ecosystem of JAX-based string-compactification packages. It provides reproducible access to Calabi-Yau geometry databases, bridges those data into physics engines such as [JAXVacua](https://github.com/StringJAX/jaxvacua), and manages persistent vacuum-solution storage with provenance.
 
 The package is intentionally solver-light. It does not replace JAXVacua, KahlerJAX, JAXiverse, or CYTools. Instead, it standardises the shared conventions that those packages and downstream scans need: catalogue queries, lazy downloads, cache/offline workflows, model loading, vault layout, validation, and curation.
 
@@ -54,8 +54,8 @@ VulcanMLView   -> geometry-disjoint train/val/test splits for ML
 
 | Package | Role | Release status |
 | --- | --- | --- |
-| **[JAXVacua](https://github.com/AndreasSchachner/jaxvacua)** &mdash; [docs](https://jaxvacua.readthedocs.io) | Type IIB flux vacua, complex-structure/axio-dilaton EFTs, vacuum finding, stability analysis | Public |
-| **[JAXPolyLog](https://github.com/AndreasSchachner/jaxpolylog)** &mdash; [docs](https://jaxpolylog.readthedocs.io) | JAX-compatible polylogarithms with autodiff support | Public |
+| **[JAXVacua](https://github.com/StringJAX/jaxvacua)** &mdash; [docs](https://jaxvacua.readthedocs.io) | Type IIB flux vacua, complex-structure/axio-dilaton EFTs, vacuum finding, stability analysis | Public |
+| **[JAXPolyLog](https://github.com/StringJAX/jaxpolylog)** &mdash; [docs](https://jaxpolylog.readthedocs.io) | JAX-compatible polylogarithms with autodiff support | Public |
 | **KahlerJAX** | Kähler-moduli stabilisation for 4D N=1 EFTs | Planned; not a StringForge dependency |
 | **JAXiverse** | Multi-axion EFT spectra, decay constants, and couplings | Planned; not a StringForge dependency |
 | **[CYTools](https://cy.tools)** | External toric Calabi-Yau geometry package | Public external dependency for selected workflows |
@@ -158,7 +158,7 @@ print(designated[["label", "n_vacua", "created"]])
 pip install stringforge
 
 # Development install from a local clone
-git clone https://github.com/AndreasSchachner/stringforge.git
+git clone https://github.com/StringJAX/stringforge.git
 cd stringforge
 pip install -e .
 ```
@@ -217,7 +217,7 @@ If you find this work useful, please cite the companion paper as the **primary**
   title = {StringForge: shared infrastructure for string-compactification workflows},
   year = {2026},
   version = {0.1.0},
-  url = {https://github.com/AndreasSchachner/stringforge}
+  url = {https://github.com/StringJAX/stringforge}
 }
 ```
 

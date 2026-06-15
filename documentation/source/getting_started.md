@@ -15,7 +15,7 @@ importantly [JAXVacua](https://jaxvacua.readthedocs.io).
 pip install stringforge
 
 # Development install from a local clone
-git clone https://github.com/AndreasSchachner/stringforge.git
+git clone https://github.com/StringJAX/stringforge.git
 cd stringforge
 pip install -e .
 ```

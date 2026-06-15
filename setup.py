@@ -10,7 +10,7 @@ setup(
     long_description_content_type='text/markdown',
     author='Andreas Schachner',
     author_email='as3475@cornell.edu',
-    url='https://github.com/AndreasSchachner/stringforge',
+    url='https://github.com/StringJAX/stringforge',
     packages=find_packages(include=['stringforge', 'stringforge.*']),
     license='GPL-3.0-only',
     classifiers=[
