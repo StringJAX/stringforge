@@ -39,6 +39,8 @@ Worker-side: stage vacua
 -----------------------------------
 
 * :meth:`Vulcan.write`
+* :meth:`Vulcan.write_vacua` — stage :class:`jaxvacua.vacuum.Vacuum` objects (one shard per geometry)
+* :func:`stringforge.vulcan.writer.vacua_to_vulcan_df` — build the shard DataFrame from vacua
 * :meth:`Vulcan.render_run_id`
 * :meth:`Vulcan.list_pending`
 * :meth:`Vulcan.remaining_budget`
@@ -58,6 +60,7 @@ Read path: query and fetch
 * :meth:`Vulcan.reader`
 * :meth:`Vulcan.query`
 * :meth:`Vulcan.fetch_run`
+* :meth:`Vulcan.read_vacua` — reconstruct :class:`jaxvacua.vacuum.Vacuum` objects from a shard
 * :meth:`VulcanReader.catalog`
 * :meth:`VulcanReader.query`
 * :meth:`VulcanReader.fetch_shard`

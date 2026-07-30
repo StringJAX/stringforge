@@ -26,6 +26,7 @@ instance, or use the thin delegation methods exposed on
     :template: custom-class-template.rst
 
     VacuaWriter
+    WriteReport
 
 
 Local / vault operations
@@ -59,3 +60,17 @@ Session-tier helpers
 * :meth:`VacuaWriter.vacua_info`
 * :meth:`VacuaWriter.delete_vacua`
 * :meth:`VacuaWriter.validate_vacua`
+
+
+Vacuum-object storage
+-----------------------------------
+
+Store and reconstruct :class:`jaxvacua.vacuum.Vacuum` / ``PFV`` / ``AFV``
+objects directly (also exposed as ``db.write_vacua`` / ``db.read_vacua`` on
+:class:`stringforge.lcs_database.LCSDatabase`).  See the
+:doc:`storing-vacuum-objects tutorial <../tutorials/storing_vacuum_objects>`.
+
+* :meth:`VacuaWriter.write_vacua` — one call; returns a :class:`WriteReport`.
+* :meth:`VacuaWriter.read_vacua`
+* :meth:`VacuaWriter.append_vacua`
+* :meth:`VacuaWriter.load_vacua` (``as_vacuum=True``)

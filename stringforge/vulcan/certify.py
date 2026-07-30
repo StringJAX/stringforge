@@ -489,18 +489,14 @@ def build_jaxvacua_certifier(
         z = np.asarray(row["moduli_re"], dtype=float) + 1j * np.asarray(row["moduli_im"], dtype=float)
         tau = float(row["tau_re"]) + 1j * float(row["tau_im"])
         flux = np.asarray(row["flux"])
-        # jaxvacua packs the real moduli vector INTERLEAVED: it reads
-        # moduli = x[0:-2:2] + 1j*x[1:-2:2] (flux_eft.py:_convert_real_to_complex),
-        # with tau at x[-2], x[-1].  A block layout
-        # ([Re(z)..., Im(z)..., Re(tau), Im(tau)]) would scramble the
-        # evaluation point for h12>=2 -- is_physical (and its metric-PD
-        # check) would then certify the WRONG moduli point.  Pack
-        # interleaved to match.
-        x = np.empty(2 * z.shape[0] + 2, dtype=float)
-        x[0:-2:2] = np.real(z)
-        x[1:-2:2] = np.imag(z)
-        x[-2] = np.real(tau)
-        x[-1] = np.imag(tau)
+        # jaxvacua packs the real moduli vector INTERLEAVED
+        # ([Re z1, Im z1, ..., Re tau, Im tau]).  A block layout
+        # ([Re(z)..., Im(z)..., Re(tau), Im(tau)]) would scramble the evaluation
+        # point for h12>=2 -- is_physical (and its metric-PD check) would then
+        # certify the WRONG moduli point.  Use jaxvacua's own statement of the
+        # layout rather than re-deriving it here, so the two can never drift.
+        from jaxvacua.vacuum import complex_to_real
+        x = complex_to_real(z, tau)
 
         phys = bool(is_physical_fn(model, sampler, x, moduli_max=moduli_max))
         stab = stability_fn(

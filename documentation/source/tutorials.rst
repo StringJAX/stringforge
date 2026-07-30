@@ -88,6 +88,8 @@ Vacua vault and infrastructure
      - Use it for
    * - :doc:`Vault workflow <tutorials/vault_workflow>`
      - Validating, designating, and preparing vacuum datasets for upload.
+   * - :doc:`Storing vacuum objects <tutorials/storing_vacuum_objects>`
+     - Writing ``jaxvacua.vacuum`` ``Vacuum`` / ``PFV`` / ``AFV`` objects directly (curated and Vulcan tiers) with exact, finder-free read-back.
    * - :doc:`Vacua storage <tutorials/database_and_infrastructure/vacua_storage>`
      - Local vacuum storage, querying, designation, retraction, and sharing.
    * - :doc:`Cluster parallelisation <tutorials/database_and_infrastructure/cluster_parallelisation>`
@@ -116,6 +118,7 @@ Advanced curated subsets
    tutorials/cicy
    tutorials/database_and_infrastructure/database_interface
    tutorials/vault_workflow
+   tutorials/storing_vacuum_objects
    tutorials/database_and_infrastructure/vacua_storage
    tutorials/database_and_infrastructure/cluster_parallelisation
    tutorials/database_and_infrastructure/vulcan_cluster_runs

@@ -329,19 +329,28 @@ def _parse_gv_row(row: Any) -> Dict[str, Any]:
     Args:
         row: A ``pandas.Series`` from the GV parquet file.
 
+    Not every sub-dataset carries both families: the ``cicy`` ``gv`` split has no
+    ``gw_charges``/``gw_invariants`` columns at all, whereas ``tdf``'s does.  A missing
+    family is reported as ``None`` rather than as a dict of ``None``s, because
+    :meth:`jaxvacua.lcs.lcs_tree._charges_from_gv_gw` guards on ``x is not None`` — handing
+    it ``{"charges": None, "invariants": None}`` slipped past that guard and raised
+    ``AttributeError: 'NoneType' object has no attribute 'shape'``.
+
     Returns:
-        Dict[str, Any]: Dictionary with keys ``"GVs"`` and ``"GWs"``, each a
-        dict with ``"charges"`` and ``"invariants"`` arrays.
+        Dict[str, Any]: Dictionary with keys ``"GVs"``, ``"GWs"`` and
+        ``"grading_vector"``.  ``"GVs"``/``"GWs"`` are each a dict with ``"charges"``
+        and ``"invariants"`` arrays, or ``None`` when that family is absent.
     """
+    def _family(charge_col: str, invariant_col: str) -> Optional[Dict[str, Any]]:
+        charges = _decode_array(row.get(charge_col))
+        invariants = _decode_invariants(row.get(invariant_col))
+        if charges is None or invariants is None:
+            return None
+        return {"charges": charges, "invariants": invariants}
+
     return {
-        "GVs": {
-            "charges":    _decode_array(row.get("gv_charges")),
-            "invariants": _decode_invariants(row.get("gv_invariants")),
-        },
-        "GWs": {
-            "charges":    _decode_array(row.get("gw_charges")),
-            "invariants": _decode_invariants(row.get("gw_invariants")),
-        },
+        "GVs": _family("gv_charges", "gv_invariants"),
+        "GWs": _family("gw_charges", "gw_invariants"),
         "grading_vector": _decode_array(row.get("grading_vector")),
     }
 

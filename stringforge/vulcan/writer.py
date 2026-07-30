@@ -432,3 +432,88 @@ def move_to(shard: StagedShard, staging_dir: Path, target: str) -> StagedShard:
         path_in_repo=shard.path_in_repo,
         n_rows=shard.n_rows,
     )
+
+
+def vacua_to_vulcan_df(
+    vacua: Any,
+    finder: Any = None,
+    *,
+    store_full: bool = True,
+    store_trajectory: bool = False,
+) -> "pd.DataFrame":
+    r"""
+    **Description:**
+    Build a Vulcan-schema :class:`pandas.DataFrame` from
+    ``jaxvacua.vacuum.Vacuum`` objects (or ``PFV`` / ``AFV``).
+
+    Each vacuum maps to one row via
+    :func:`stringforge._vacuum_adapter.vacuum_to_row`: the vault-floor columns
+    (``flux``, ``moduli_re``, ``moduli_im``, ``tau_re``, ``tau_im``) plus the
+    optional physics columns (``W_re``/``W_im``, ``F_terms_re``/``F_terms_im``,
+    ``g_s``, ``residual``, ``is_susy``, ``tadpole_charge``).  The authoritative
+    JSON-encoded ``Vacuum.to_dict()`` record travels in ``extra_data`` for exact,
+    finder-free read-back (never pickle).
+
+    Args:
+        vacua: A ``Vacuum`` or an iterable of them.
+        finder: Optional finder — used only for ``tadpole_charge`` =
+            ``finder.tadpole(flux)`` (the geometry-independent D3 charge).
+        store_full (bool): If True (default), embed the full record in
+            ``extra_data``.  If False, only the readable ``kind`` / ``model_name``
+            keys are kept (a shard-size escape hatch; read-back then needs a
+            finder to rebuild from the typed columns).
+        store_trajectory (bool): Persist the verbose optimisation trajectory in
+            the stored record.  Defaults to ``False``.
+
+    Returns:
+        pandas.DataFrame: One row per vacuum, ready for :meth:`Vulcan.write`.
+    """
+    import json
+
+    import numpy as np
+
+    from .._vacuum_adapter import is_vacuum, vacuum_to_row
+
+    items = [vacua] if is_vacuum(vacua) else list(vacua)
+    rows: list[dict] = []
+    for v in items:
+        result, extra = vacuum_to_row(v, finder, store_trajectory=store_trajectory)
+        z = np.asarray(result["moduli"])
+        tau = complex(result["tau"])
+        fl = np.real(np.asarray(result["flux"]))
+        row: dict[str, Any] = {
+            "flux": [int(round(float(a))) for a in fl.ravel()],
+            "moduli_re": [float(a) for a in np.real(z).ravel()],
+            "moduli_im": [float(a) for a in np.imag(z).ravel()],
+            "tau_re": float(tau.real),
+            "tau_im": float(tau.imag),
+            "is_susy": bool(result.get("is_susy")),
+        }
+        res = result.get("residual")
+        row["residual"] = None if res is None else float(res)
+        nflux = result.get("N_flux")
+        if nflux is not None:
+            row["tadpole_charge"] = int(nflux)
+        W = result.get("W")
+        if W is not None:
+            Wc = complex(W)
+            row["W_re"], row["W_im"] = float(Wc.real), float(Wc.imag)
+        F = result.get("F_terms")
+        if F is not None:
+            Fa = np.asarray(F)
+            row["F_terms_re"] = [float(a) for a in np.real(Fa).ravel()]
+            row["F_terms_im"] = [float(a) for a in np.imag(Fa).ravel()]
+        gs = getattr(v, "gs", None)
+        if gs is not None:
+            try:
+                gsf = float(gs)
+                if np.isfinite(gsf):
+                    row["g_s"] = gsf
+            except (TypeError, ValueError):
+                pass
+        payload = dict(extra)
+        if not store_full:
+            payload.pop("vacuum", None)
+        row["extra_data"] = json.dumps(payload)
+        rows.append(row)
+    return pd.DataFrame(rows)

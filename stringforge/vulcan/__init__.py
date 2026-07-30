@@ -86,6 +86,7 @@ from .writer import (
     SYNCED_DIRNAME,
     StagedShard,
     list_pending,
+    vacua_to_vulcan_df,
     write_shard,
 )
 
@@ -112,6 +113,7 @@ __all__ = (
     "dedup_key",
     "review_submission",
     "resolve_staging_dir",
+    "vacua_to_vulcan_df",
 )
 
 
@@ -419,6 +421,128 @@ class Vulcan:
             solver=solver,
             provenance=provenance,
         )
+
+    # ── vacuum-object convenience (jaxvacua.vacuum objects) ─────────
+
+    def write_vacua(
+        self,
+        vacua: Any,
+        *,
+        models: Any = None,
+        finder: Any = None,
+        geometry: Optional[Mapping[str, Any]] = None,
+        store_full: bool = True,
+        store_trajectory: bool = False,
+        tadpole_charge: Optional[int] = None,
+        run_id: Optional[str] = None,
+        solver: Optional[Mapping[str, Any]] = None,
+        provenance: Optional[Mapping[str, Any]] = None,
+    ) -> Any:
+        r"""
+        **Description:**
+        Stage ``jaxvacua.vacuum.Vacuum`` objects as Vulcan shards — the
+        production-tier analogue of
+        :meth:`stringforge.vacua_writer.LCSDatabase.write_vacua`.
+
+        The vacua are grouped by geometry (one shard = one geometry, the Vulcan
+        invariant) and each group is written via :meth:`write`.  Geometry is
+        resolved from (in order) an explicit *geometry* mapping, each vacuum's
+        stamped ``metadata["identity"]``, or *finder* / *models*.
+
+        Args:
+            vacua: A ``Vacuum`` / ``PFV`` / ``AFV`` or an iterable of them.
+            models: Optional finder resolution — a single finder, a
+                ``PromotionModels``, or a ``{model_name: finder|PromotionModels}``
+                dict (used for ``tadpole_charge`` and the geometry fallback).
+            finder: A single finder applied to every group (overrides *models*).
+            geometry: Explicit ``{h11, h12, ks_id, ...}`` mapping (overrides the
+                stamped identity).  Required when neither identity nor a finder
+                is available.
+            store_full (bool): Embed the full record in ``extra_data``.
+            store_trajectory (bool): Keep the verbose trajectory in the record.
+            tadpole_charge (int | None): Override the per-row tadpole charge.
+            run_id, solver, provenance: Forwarded to :meth:`write`.
+
+        Returns:
+            StagedShard, or a ``list`` of them when the input spans multiple
+            geometries.
+        """
+        from .._vacuum_adapter import is_vacuum
+        from ..vacua_writer import _extract_model_identity, _resolve_finder
+        from .schema import GEOMETRY_KEYS, GEOMETRY_KEY_SENTINEL
+        from .writer import vacua_to_vulcan_df
+
+        items = [vacua] if is_vacuum(vacua) else list(vacua)
+        groups: dict[str, list] = {}
+        for v in items:
+            meta = getattr(v, "metadata", None) or {}
+            ident = meta.get("identity") or {}
+            name = meta.get("model_name") or ident.get("model_name") or "unknown"
+            groups.setdefault(str(name), []).append(v)
+
+        shards: list = []
+        for name, group in groups.items():
+            fdr = finder if finder is not None else _resolve_finder(models, name)
+            if fdr is None and tadpole_charge is None:
+                raise ValueError(
+                    f"vulcan.write_vacua: geometry {name!r} — the production tier "
+                    f"requires a D3 tadpole charge (a REQUIRED column). Pass "
+                    f"models=/finder= (tadpole computed via finder.tadpole) or an "
+                    f"explicit tadpole_charge=."
+                )
+            ident = (getattr(group[0], "metadata", None) or {}).get("identity") or {}
+            if not ident and fdr is not None:
+                try:
+                    ident = _extract_model_identity(fdr)
+                except Exception:
+                    ident = {}
+            base = {**ident, **(dict(geometry) if geometry else {})}
+            if base.get("h11") is None or base.get("h12") is None:
+                raise ValueError(
+                    f"vulcan.write_vacua: geometry for group {name!r} is unknown "
+                    f"— pass geometry=..., models=..., or promote with identity "
+                    f"stamping."
+                )
+            geom = {k: int(base.get(k, GEOMETRY_KEY_SENTINEL)) for k in GEOMETRY_KEYS}
+            df = vacua_to_vulcan_df(group, finder=fdr, store_full=store_full,
+                                    store_trajectory=store_trajectory)
+            shards.append(self.write(
+                df, geometry=geom, run_id=run_id, tadpole_charge=tadpole_charge,
+                solver=solver, provenance=provenance,
+            ))
+        return shards[0] if len(shards) == 1 else shards
+
+    def read_vacua(self, source: Any, *, finder: Any = None) -> list:
+        r"""
+        **Description:**
+        Reconstruct ``jaxvacua.vacuum.Vacuum`` objects from a Vulcan shard, a
+        parquet path, or an already-read :class:`pandas.DataFrame` — the inverse
+        of :meth:`write_vacua`.
+
+        Rows carrying a stored record are rebuilt exactly (finder-free); rows
+        written with ``store_full=False`` (no record) are skipped.
+
+        Args:
+            source: A :class:`~stringforge.vulcan.writer.StagedShard`, a parquet
+                path, or a :class:`pandas.DataFrame`.
+            finder: Optional finder (reserved for rebuilding record-less rows).
+
+        Returns:
+            list: Reconstructed ``Vacuum`` objects.
+        """
+        from .._vacuum_adapter import row_to_vacuum
+
+        if isinstance(source, pd.DataFrame):
+            df = source
+        else:
+            path = getattr(source, "parquet_path", source)
+            df = pd.read_parquet(path)
+        out: list = []
+        for _, r in df.iterrows():
+            v = row_to_vacuum(r.get("extra_data"), finder=finder)
+            if v is not None:
+                out.append(v)
+        return out
 
     # ── observability ──────────────────────────────────────────────
 

@@ -654,6 +654,48 @@ def _compute_derived(
     return out
 
 
+class WriteReport:
+    r"""
+    **Description:**
+    Summary returned by :meth:`VacuaWriter.write_vacua` /
+    :meth:`stringforge.lcs_database.LCSDatabase.write_vacua`.
+
+    Attributes:
+        n_written (int): Total rows written across all geometries.
+        n_duplicates (int): Rows skipped as duplicates.
+        run_ids_by_geometry (dict): ``{geometry_name: run_id}``.
+        geometries (list): Geometry names written, in first-seen order.
+    """
+
+    def __init__(self, n_written, n_duplicates, run_ids_by_geometry, geometries):
+        self.n_written = int(n_written)
+        self.n_duplicates = int(n_duplicates)
+        self.run_ids_by_geometry = dict(run_ids_by_geometry)
+        self.geometries = list(geometries)
+
+    def __repr__(self) -> str:
+        return (f"WriteReport(n_written={self.n_written}, "
+                f"n_duplicates={self.n_duplicates}, "
+                f"geometries={self.geometries})")
+
+
+def _resolve_finder(models: Any, model_name: Optional[str]) -> Any:
+    r"""Pick a finder for *model_name* from a flexible ``models`` argument.
+
+    Accepts a single finder, a ``PromotionModels`` bundle (uses its full-form
+    ``.conilcs`` finder), or a ``{model_name: finder | PromotionModels}`` dict.
+    Returns ``None`` when *models* is ``None`` or the name is absent.
+    """
+    if models is None:
+        return None
+    if isinstance(models, dict):
+        entry = models.get(model_name)
+        return _resolve_finder(entry, model_name) if entry is not None else None
+    if hasattr(models, "conilcs"):        # a PromotionModels bundle
+        return models.conilcs
+    return models                          # assume a single finder
+
+
 class _VacuaStreamWriter:
     r"""
     Context manager for buffered writing of vacuum solutions to local parquet
@@ -680,6 +722,9 @@ class _VacuaStreamWriter:
             this model.
         map_to_fd (bool): If True and *model* has ``map_to_FD``, map each
             vacuum to the fundamental domain before storing and deduplicating.
+        store_trajectory (bool): If True, keep the verbose optimisation
+            trajectory when a ``jaxvacua.vacuum.Vacuum`` is appended (it is
+            dropped by default).
     """
 
     def __init__(
@@ -694,6 +739,7 @@ class _VacuaStreamWriter:
         filter_fn: Any = None,
         deduplicate: bool = True,
         map_to_fd: bool = False,
+        store_trajectory: bool = False,
     ) -> None:
         """Initialise the vacua writer for a given model identity and run."""
         self._vacua_dir = vacua_dir
@@ -706,6 +752,7 @@ class _VacuaStreamWriter:
         self._filter_fn = filter_fn
         self._deduplicate = deduplicate
         self._map_to_fd = map_to_fd and model is not None and hasattr(model, 'map_to_FD')
+        self._store_trajectory = store_trajectory
 
         self._buffer: List[dict] = []
         self._flushed_count: int = 0
@@ -752,15 +799,29 @@ class _VacuaStreamWriter:
     ) -> None:
         r"""
         **Description:**
-    Append a single vacuum solution.
+        Append a single vacuum solution.
 
         Args:
             result: Either a dict ``{"flux", "moduli", "tau", ...}`` (as
-                returned by ``enumerate_fluxes``) or a tuple
-                ``(moduli, tau, flux)``.
+                returned by ``enumerate_fluxes``), a tuple ``(moduli, tau,
+                flux)``, or a ``jaxvacua.vacuum.Vacuum`` / ``PFV`` / ``AFV``
+                (mapped to a row plus its authoritative record via
+                :mod:`stringforge._vacuum_adapter`).
             tags: String or list of tag strings.
             extra_data: Optional dict of arbitrary per-vacuum metadata.
+                Adapter-supplied keys take precedence for a ``Vacuum`` input.
         """
+        # A ``jaxvacua.vacuum.Vacuum`` / ``PFV`` / ``AFV`` maps to the row dict and
+        # stashes its authoritative record in ``extra_data`` (see
+        # :mod:`stringforge._vacuum_adapter`).  ``is_vacuum`` short-circuits on
+        # dict/tuple inputs, so this never imports jaxvacua on the array path.
+        from ._vacuum_adapter import is_vacuum, vacuum_to_row
+        if is_vacuum(result):
+            vres, vextra = vacuum_to_row(
+                result, self._model, store_trajectory=self._store_trajectory)
+            result = vres
+            extra_data = {**(extra_data or {}), **vextra}   # adapter keys take precedence
+
         if isinstance(result, (tuple, list)) and not isinstance(result, dict):
             moduli, tau, flux = result
             result = {"moduli": moduli, "tau": tau, "flux": flux}
@@ -789,6 +850,29 @@ class _VacuaStreamWriter:
 
         vid = self._flushed_count + len(self._buffer)
         self._buffer.append(_vacua_row_from_dict(result, vid, tags, extra_data))
+
+    def append_vacua(self, vacua: Any, tags: Optional[Any] = None) -> None:
+        r"""
+        **Description:**
+        Append a sequence of ``jaxvacua.vacuum.Vacuum`` objects, all belonging to
+        *this* writer's geometry.  Each is mapped via
+        :func:`stringforge._vacuum_adapter.vacuum_to_row` (queryable typed columns
+        + authoritative record in ``extra_data``).
+
+        Args:
+            vacua: Iterable of ``Vacuum`` / ``PFV`` / ``AFV`` objects.
+            tags: String or list of tag strings applied to every row.
+        """
+        import warnings
+        want = self._identity.get("model_name")
+        for v in vacua:
+            got = (getattr(v, "metadata", None) or {}).get("model_name")
+            if want and got and got != want:
+                warnings.warn(
+                    f"append_vacua: vacuum model_name {got!r} != writer model_name "
+                    f"{want!r}; the writer is per-geometry."
+                )
+            self.append(v, tags=tags)
 
     def append_batch(
         self,
@@ -1083,6 +1167,7 @@ class VacuaWriter:
         filter_fn: Any = None,
         deduplicate: bool = True,
         map_to_fd: bool = False,
+        store_trajectory: bool = False,
         metadata: Optional[dict] = None,
         tags: Optional[list] = None,
     ) -> "_VacuaStreamWriter":
@@ -1116,6 +1201,9 @@ class VacuaWriter:
             map_to_fd (bool): If True and *model* has ``map_to_FD``, map each
                 vacuum to the fundamental domain (SL(2,Z) for tau, monodromy
                 for z) before storing and deduplicating.  Defaults to ``False``.
+            store_trajectory (bool): If True, persist the verbose optimisation
+                trajectory when a ``jaxvacua.vacuum.Vacuum`` is appended.
+                Defaults to ``False`` (the trajectory is dropped).
             metadata (dict | None): Arbitrary JSON-serialisable run metadata.
             tags (list | None): Searchable tags folded into *metadata* under
                 the ``"tags"`` key.  Accepted so callers that pass ``tags=``
@@ -1157,7 +1245,176 @@ class VacuaWriter:
             filter_fn=filter_fn,
             deduplicate=deduplicate,
             map_to_fd=map_to_fd,
+            store_trajectory=store_trajectory,
         )
+    def write_vacua(
+        self,
+        vacua: Any,
+        *,
+        models: Any = None,
+        method: str = "afvs",
+        tags: Optional[Any] = None,
+        only_solved: bool = True,
+        store_trajectory: bool = False,
+        map_to_fd: bool = False,
+        designate: Optional[str] = None,
+        committed_by: str = "afvs",
+    ) -> "WriteReport":
+        r"""
+        **Description:**
+        One-call store for ``jaxvacua.vacuum.Vacuum`` objects (or ``PFV`` /
+        ``AFV``).  Accepts a single vacuum or an iterable spanning *any* number
+        of geometries: the vacua are grouped by geometry and written through one
+        streaming writer per geometry.  The authoritative ``Vacuum.to_dict()``
+        record is JSON-encoded into each row's ``extra_data`` (finder-free,
+        exact read-back via :meth:`read_vacua`); the typed columns are the
+        queryable projection.
+
+        Args:
+            vacua: A ``Vacuum`` / ``PFV`` / ``AFV`` or an iterable of them.
+            models: Optional finder resolution — a single finder, a
+                ``PromotionModels`` bundle (its ``.conilcs`` finder is used), or
+                a ``{model_name: finder | PromotionModels}`` dict.  If omitted,
+                geometry identity is read from each vacuum's
+                ``metadata["identity"]`` (finder-free).
+            method (str): Provenance method label.  Defaults to ``"afvs"``.
+            tags: Tags applied to every written row.
+            only_solved (bool): If True (default), skip vacua whose
+                ``is_solved()`` is False.  Note this is a **duck-typed** filter:
+                promotion provenance lives on the ``afvs`` subclasses, so a base
+                ``jaxvacua.vacuum.Vacuum`` has no ``is_solved`` and is therefore
+                always kept.  That is deliberate -- a vacuum from a plain Newton
+                solve has no pipeline whose success could be in question, and
+                F-flatness is carried by ``residual`` (which becomes the
+                ``is_susy`` column) rather than by a producer-set flag.
+            store_trajectory (bool): Persist the verbose optimisation trajectory
+                in the stored record.  Defaults to ``False``.
+            map_to_fd (bool): If True (and a finder is available), map each
+                vacuum to the fundamental domain before deduplicating the typed
+                columns.  The stored record is unaffected.  Defaults to
+                ``False``.
+            designate (str | None): If given, promote each run's vacua to the
+                curated vault under this label.
+            committed_by (str): Author recorded for designation.
+
+        Returns:
+            WriteReport: Counts and per-geometry run ids.
+
+        Raises:
+            ValueError: If a geometry has neither a resolvable finder nor a
+                stamped ``metadata["identity"]`` carrying ``h11``/``h12``.
+        """
+        from ._vacuum_adapter import is_vacuum
+        items = [vacua] if is_vacuum(vacua) else list(vacua)
+        if only_solved:
+            items = [v for v in items
+                     if bool(getattr(v, "is_solved", lambda: True)())]
+
+        def _identity(v):
+            return (getattr(v, "metadata", None) or {}).get("identity") or {}
+
+        def _geo_key(v):
+            meta = getattr(v, "metadata", None) or {}
+            ident = _identity(v)
+            name = meta.get("model_name") or ident.get("model_name")
+            if name:
+                return str(name)
+            if ident.get("h11") is not None:
+                return "geo_" + "_".join(
+                    str(ident.get(k)) for k in
+                    ("h11", "h12", "ks_id", "triang_id", "conifold_id"))
+            return "unknown"
+
+        groups: Dict[str, list] = {}
+        for v in items:
+            groups.setdefault(_geo_key(v), []).append(v)
+
+        run_ids: Dict[str, str] = {}
+        n_written = 0
+        n_dupes = 0
+        for name, group in groups.items():
+            finder = _resolve_finder(models, name)
+            id_kwargs: Dict[str, Any] = {}
+            if finder is None:
+                ident = _identity(group[0])
+                if ident.get("h11") is None or ident.get("h12") is None:
+                    raise ValueError(
+                        f"write_vacua: geometry {name!r} has no resolvable "
+                        f"finder and no stamped metadata['identity']. Pass "
+                        f"models={{'{name}': finder}} (or a single finder / "
+                        f"PromotionModels), or promote with identity stamping."
+                    )
+                id_kwargs = {
+                    k: ident[k] for k in
+                    ("h11", "h12", "ks_id", "triang_id", "conifold_id",
+                     "cicy_id", "model_name")
+                    if ident.get(k) is not None
+                }
+            writer_kwargs = dict(
+                model=finder, method=method,
+                store_trajectory=store_trajectory, map_to_fd=map_to_fd,
+            )
+            writer_kwargs.update(id_kwargs)      # finder-free: h11..cicy_id, model_name
+            # Label the writer (and its rows) with the group's model_name so the
+            # finder-provided path doesn't fall back to the tree's internal name
+            # (which would spuriously trip the append_vacua mismatch warning).
+            if name and name != "unknown" and "model_name" not in writer_kwargs:
+                writer_kwargs["model_name"] = name
+            with self.vacua_writer(**writer_kwargs) as w:
+                w.append_vacua(group, tags=tags)
+            run_ids[name] = w.run_id
+            n_written += w.count
+            n_dupes += w.n_duplicates_skipped
+            if designate:
+                try:
+                    df = self.load_vacua(run_ids[name])
+                    self.designate_vacua(
+                        df, designate, committed_by,
+                        model=finder, **id_kwargs)
+                except Exception as exc:       # designation is a convenience
+                    warnings.warn(
+                        f"write_vacua: designation of run {run_ids[name]} "
+                        f"({name}) failed: {exc}")
+        return WriteReport(n_written, n_dupes, run_ids, list(groups))
+
+    def read_vacua(
+        self,
+        run_id: Optional[str] = None,
+        *,
+        finder: Any = None,
+        **query: Any,
+    ) -> list:
+        r"""
+        **Description:**
+        Read stored vacua back as ``jaxvacua.vacuum.Vacuum`` objects — the
+        inverse of :meth:`write_vacua`.
+
+        With *run_id*, returns that run's vacua; otherwise runs
+        :meth:`query_vacua` with the given filters and reconstructs every
+        matching row that carries a stored record.  Rows written via the array
+        path (no record) are skipped.
+
+        Args:
+            run_id (str | None): Restrict to a single run.
+            finder: Optional finder (reserved for rebuilding array-written rows).
+            **query: Filters forwarded to :meth:`query_vacua`
+                (``h11``, ``h12``, ``ks_id``, ...).
+
+        Returns:
+            list: Reconstructed ``Vacuum`` objects.
+        """
+        from ._vacuum_adapter import row_to_vacuum
+        if run_id is not None:
+            return self.load_vacua(run_id, as_vacuum=True, finder=finder)
+        df = self.query_vacua(**query)
+        out: list = []
+        if df is None or len(df) == 0:
+            return out
+        for _, r in df.iterrows():
+            v = row_to_vacuum(r.get("extra_data"), finder=finder)
+            if v is not None:
+                out.append(v)
+        return out
     def query_vacua(
         self,
         h11: Optional[int] = None,
@@ -1269,16 +1526,24 @@ class VacuaWriter:
         if limit is not None:
             result = result.head(limit)
         return result
-    def load_vacua(self, run_id: str) -> Any:
+    def load_vacua(self, run_id: str, *, as_vacuum: bool = False,
+                   finder: Any = None) -> Any:
         r"""
         **Description:**
         Load all vacuum solutions from a specific run.
 
         Args:
             run_id (str): UUID of the run.
+            as_vacuum (bool): If True, return a ``list`` of reconstructed
+                ``jaxvacua.vacuum.Vacuum`` objects (rebuilt from the authoritative
+                record stashed in ``extra_data``) instead of a DataFrame.  Rows
+                written via the array path carry no record and are skipped with a
+                warning.
+            finder: Optional finder (reserved for reconstructing array-written
+                rows from the typed columns).
 
         Returns:
-            pandas.DataFrame: All rows from the run's parquet file.
+            pandas.DataFrame, or ``list`` of ``Vacuum`` when *as_vacuum* is True.
 
         Raises:
             KeyError: If the run is not found in the catalog.
@@ -1298,6 +1563,22 @@ class VacuaWriter:
         df = pd.read_parquet(path)
         df = _propagate_run_fields(df, row)
         df = _synthesize_complex_columns(df)
+        if as_vacuum:
+            from ._vacuum_adapter import row_to_vacuum
+            out, skipped = [], 0
+            for _, r in df.iterrows():
+                v = row_to_vacuum(r.get("extra_data"), finder=finder)
+                if v is None:
+                    skipped += 1
+                else:
+                    out.append(v)
+            if skipped:
+                import warnings
+                warnings.warn(
+                    f"load_vacua(as_vacuum=True): {skipped} array-written row(s) "
+                    f"had no stored Vacuum record and were skipped."
+                )
+            return out
         return df
     def solution_exists(
         self,

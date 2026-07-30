@@ -60,6 +60,35 @@ def _swap_h_columns(df: Any) -> Any:
     return df.rename(columns={"h11": "h12", "h12": "h11"})
 
 
+#: Sub-datasets whose catalog already stores Hodge numbers in the **mirror**
+#: convention that :class:`~jaxvacua.lcs.lcs_tree` expects, and which must
+#: therefore *not* be swapped on the way in or out.
+#:
+#: ``cicy`` is the case: its catalog stores ``h11`` = the CY's :math:`h^{2,1}`
+#: and ``h12`` = the CY's :math:`h^{1,1}` — e.g. ``cicy_id=7890`` (the quintic in
+#: :math:`\mathbb{P}^4`, :math:`h^{1,1}=1`, :math:`h^{2,1}=101`) is stored as
+#: ``h11=101, h12=1``.  Swapping it handed ``lcs_tree`` ``h12=101`` where the
+#: geometry has rank 1, and since ``lcs.py`` dimensions the intersection tensor by
+#: ``h12`` the result was a ``(101, 101, 101)`` tensor alongside a length-1 ``c2``.
+#: ``tdf``/``kklt`` do store the catalog convention (small ``h11`` = rank) and are
+#: unaffected — which is why the bug only ever showed up for ``cicy``.
+_NO_H_SWAP_DATASETS = frozenset({"cicy"})
+
+
+def _needs_h_swap(dataset: str) -> bool:
+    r"""Whether *dataset*'s catalog Hodge numbers need the mirror swap."""
+    return dataset not in _NO_H_SWAP_DATASETS
+
+
+#: Sub-datasets whose ``gv/`` split is **flat** (a single bucket) rather than
+#: bucketed as ``gv/h11_{N}/``.  Kept separate from
+#: :data:`_NO_H_SWAP_DATASETS` on purpose: the GV layout and the Hodge-number
+#: convention are independent properties that merely coincide for ``cicy``, and
+#: conflating them would silently mis-route a future sub-dataset that had one but
+#: not the other.
+_FLAT_GV_DATASETS = frozenset({"cicy"})
+
+
 def _parse_lcs_row(row: Any, dataset: str) -> Dict[str, Any]:
     r"""
     **Description:**
@@ -397,7 +426,10 @@ class LCSDatabase(CYDatabase):
         # use the catalog convention, so swap the user-supplied Hodge numbers
         # before any further processing.  The post-fetch swap further down
         # restores mirror convention for the kwargs handed to `lcs_tree`.
-        h11, h12 = h12, h11
+        # Skipped for datasets already stored mirror-convention (see
+        # :data:`_NO_H_SWAP_DATASETS`).
+        if _needs_h_swap(self.dataset):
+            h11, h12 = h12, h11
 
         self._check_cache_size()
         self._validate_key(ks_id, triang_id, cicy_id)
@@ -459,7 +491,11 @@ class LCSDatabase(CYDatabase):
         # ---- Optionally fetch GV invariants --------------------------------
         gvs, gws, grading_vec = None, None, None
         if include_gv and entry.get("has_gv", False):
-            _gv_split = f"gv/h11_{h11}"
+            # `cicy`'s gv/ split is FLAT by design (a single bucket); tdf/kklt bucket
+            # it by catalog h11.  Building the bucketed path unconditionally raised
+            # FileNotFoundError for every cicy model, including the card's headline
+            # `include_gv=True` example.
+            _gv_split = "gv" if self.dataset in _FLAT_GV_DATASETS else f"gv/h11_{h11}"
             if self.cache_mode == "persistent":
                 gv_shard = self._fetch_shard(_gv_split, int(entry["gv_shard_id"]))
                 gv_row   = gv_shard.iloc[int(entry["gv_row_index"])]
@@ -479,11 +515,15 @@ class LCSDatabase(CYDatabase):
         kwargs["grading_vector"] = grading_vec
         
         
-        # Flip Hodge numbers for input
+        # Catalog -> mirror for the kwargs handed to `lcs_tree`.  Skipped for
+        # datasets already stored mirror-convention (see :data:`_NO_H_SWAP_DATASETS`);
+        # `chi` is always dropped so `lcs_tree` recomputes chi = -2*(h11 - h12),
+        # which is correct in either convention.
         h11 = kwargs["h11"]
         h12 = kwargs["h12"]
-        kwargs["h11"] = h12
-        kwargs["h12"] = h11
+        if _needs_h_swap(self.dataset):
+            kwargs["h11"] = h12
+            kwargs["h12"] = h11
         kwargs["chi"] = None
         
         if h11 == 0 or h12 == 0:
@@ -652,7 +692,7 @@ class LCSDatabase(CYDatabase):
         This is a convenience wrapper around :meth:`load` followed by
         construction of a
         :class:`~jaxvacua.flux_vacua_finder.FluxVacuaFinder` with
-        ``lcs_tree_input``.  The returned object includes the period,
+        ``lcs_tree``.  The returned object includes the period,
         complex-structure-sector, flux-EFT, and vacuum-finding layers.
 
         Args:
@@ -692,7 +732,7 @@ class LCSDatabase(CYDatabase):
             maximum_degree=maximum_degree if include_gv else None,
         )
         return FluxVacuaFinder(
-            lcs_tree_input=tree,
+            lcs_tree=tree,
             maximum_degree=maximum_degree,
             **model_kwargs,
         )
@@ -1022,16 +1062,22 @@ class LCSDatabase(CYDatabase):
         ``q.sum()``.  Entries with total degree greater than ``maximum_degree``
         are removed.
 
+        Either family may be ``None`` when the sub-dataset does not carry it — the
+        ``cicy`` ``gv`` split has no GW columns at all — in which case it is passed
+        through untouched.
+
         Args:
-            gvs (dict): GV data with keys ``"charges"`` and ``"invariants"``.
-            gws (dict): GW data with keys ``"charges"`` and ``"invariants"``.
+            gvs (dict | None): GV data with keys ``"charges"`` and ``"invariants"``.
+            gws (dict | None): GW data, same shape, or ``None`` if absent.
             maximum_degree (int): Maximum allowed total degree.
 
         Returns:
-            Tuple[dict, dict]: Truncated ``(gvs, gws)``.
+            Tuple[dict | None, dict | None]: Truncated ``(gvs, gws)``.
         """
-        def _trunc(data: Dict[str, Any]) -> Dict[str, Any]:
+        def _trunc(data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
             """Truncate data arrays to entries within the maximum degree."""
+            if data is None:
+                return None
             charges = data.get("charges")
             invs    = data.get("invariants")
             if charges is None or invs is None or grading_vec is None:
@@ -1077,7 +1123,7 @@ class LCSDatabase(CYDatabase):
         if key is not None and key == self._cached_filter_key:
             return self._cached_models
         trees = self.load_batch(**filters)
-        models = [FluxVacuaFinder(lcs_tree_input=t) for t in trees]
+        models = [FluxVacuaFinder(lcs_tree=t) for t in trees]
         self._cached_models     = models
         self._cached_filter_key = key
         return models
@@ -1124,7 +1170,7 @@ class LCSDatabase(CYDatabase):
                 f"iter_model_batch got unexpected kwargs with identifiers already given: {list(kwargs)}"
             )
         for tree in self.iter_batch(identifiers, **iter_kw):
-            yield FluxVacuaFinder(lcs_tree_input=tree)
+            yield FluxVacuaFinder(lcs_tree=tree)
 
     @property
     def cached_models(self) -> Optional[List[Any]]:
@@ -1166,6 +1212,8 @@ class LCSDatabase(CYDatabase):
     def complete_missing(self, *args, **kwargs):    return self._vw.complete_missing(*args, **kwargs)
     def delete_vacua(self, *args, **kwargs):        return self._vw.delete_vacua(*args, **kwargs)
     def vacua_writer(self, *args, **kwargs):        return self._vw.vacua_writer(*args, **kwargs)
+    def write_vacua(self, *args, **kwargs):         return self._vw.write_vacua(*args, **kwargs)
+    def read_vacua(self, *args, **kwargs):          return self._vw.read_vacua(*args, **kwargs)
     def designated_info(self, *args, **kwargs):     return self._vw.designated_info(*args, **kwargs)
     def _resolve_vacua_dir(self, *args, **kwargs):   return self._vw._resolve_vacua_dir(*args, **kwargs)
     def query_vacua(self, *args, **kwargs):         return self._vw.query_vacua(*args, **kwargs)

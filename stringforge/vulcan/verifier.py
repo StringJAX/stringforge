@@ -41,18 +41,35 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping, Optional, Tuple
 
-#: The ordered physicality-cascade check names.  The order is part of
-#: the verifier identity: a verifier that runs the same checks in a
-#: different order is, for provenance purposes, a different verifier.
-#: These names mirror the cascade in
-#: ``jaxvacua.flux_utils.is_physical`` plus Vulcan's local endpoint
-#: stability diagnostics.
+#: The ordered physicality-cascade check names -- the *vocabulary* a
+#: :class:`VerifierSpec` may draw on.  The order is part of the verifier
+#: identity: a verifier that runs the same checks in a different order is,
+#: for provenance purposes, a different verifier.
+#:
+#: These names mirror ``jaxvacua.vacuum.Vacuum.diagnostics`` (the
+#: structured successor to ``jaxvacua.flux_utils.is_physical``) plus
+#: Vulcan's local endpoint stability diagnostics.  The four entries added
+#: for ``diagnostics`` -- ``residual``, ``im_tau_positive``,
+#: ``flux_integrality`` and ``tadpole`` -- were **inserted without
+#: reordering the pre-existing names**, so every ``VerifierSpec`` written
+#: against the old tuple still satisfies the canonical-order check.
+#:
+#: Two entries have no counterpart in ``diagnostics``, deliberately:
+#: ``im_z_positive`` (``Im z > 0`` is *not* a physicality requirement --
+#: the moduli constraint is Kähler-cone membership plus metric
+#: positivity) and ``mass_min_eig`` (``diagnostics`` routes stability
+#: through ``classify_solution``, never ``mass_matrix``, whose
+#: ``mode=None``/``"SUSY"`` branches have open defects).
 CANONICAL_CHECK_NAMES: Tuple[str, ...] = (
+    "residual",             # max|DW| < residual_tol
+    "im_tau_positive",      # Im(tau) > 0
+    "flux_integrality",     # |f - round(f)| < 1e-9
     "runaway_bound",        # max(|moduli|, |tau|) <= moduli_max
     "dilaton_floor",        # Im(tau) > s_lower
     "kahler_cone",          # cone hyperplane test
+    "tadpole",              # SIGNED window 0 < f.Sigma.h <= Q
     "kahler_metric_pd",     # eig(K) > 0  -- the 2026-06-02 check
-    "im_z_positive",        # fallback Im(z_i) > 0
+    "im_z_positive",        # fallback Im(z_i) > 0 (jaxvacua-only; see above)
     "hessian_min_eig",      # stability: real-Hessian min eigenvalue
     "mass_min_eig",         # stability: mass-matrix min eigenvalue
 )
@@ -310,7 +327,25 @@ class VerifierRegistry:
 #: jaxvacua git SHA is a placeholder to be filled at certification time
 #: from the live build; it is intentionally not pinned here so this
 #: module stays solver-free.
-FULL_CASCADE_CHECKS: Tuple[str, ...] = CANONICAL_CHECK_NAMES
+#:
+#: **Written out explicitly rather than aliasing** :data:`CANONICAL_CHECK_NAMES`.
+#: It used to be that alias, which made every ``verifier_id`` computed from it a
+#: hostage of the vocabulary: extending the canonical list would silently re-hash
+#: this cascade and orphan already-written shards, whose stored ids
+#: :meth:`VerifierRegistry.from_dicts` re-derives and compares.  The vocabulary
+#: may now grow; this cascade is frozen and changes only as a deliberate,
+#: recorded act.  Verified stable across the 2026-07-29 vocabulary extension:
+#: ``VerifierSpec("abc123", FULL_CASCADE_CHECKS, tolerances={"residual": 1e-6})``
+#: hashes to ``v1-56dfdae133d5375a`` before and after.
+FULL_CASCADE_CHECKS: Tuple[str, ...] = (
+    "runaway_bound",
+    "dilaton_floor",
+    "kahler_cone",
+    "kahler_metric_pd",
+    "im_z_positive",
+    "hessian_min_eig",
+    "mass_min_eig",
+)
 
 
 __all__ = (

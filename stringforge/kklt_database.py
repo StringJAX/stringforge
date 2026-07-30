@@ -1400,7 +1400,7 @@ class KKLTDatabase(LCSDatabase):
             include_polytope   = include_polytope,
             maximum_degree     = maximum_degree,
         )
-        return FluxVacuaFinder(lcs_tree_input=tree, **kwargs)
+        return FluxVacuaFinder(lcs_tree=tree, **kwargs)
 
     def load_dataframes(
         self,
