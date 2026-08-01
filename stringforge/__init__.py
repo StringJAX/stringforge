@@ -288,6 +288,8 @@ def set_vulcan_budget(budget):
 # ──────────────────────────────────────────────────────────────────────────
 
 from .cy_io import *
+from .toric_db import *      # ToricCYDatabase (sharded toric sub-dataset)
+from .cy_phase import *      # CYPhase / ToricCYPhase (per-geometry objects)
 from .lcs_database import *
 from .kklt_database import *
 from .vacua_writer import *

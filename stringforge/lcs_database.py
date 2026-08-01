@@ -525,14 +525,34 @@ class LCSDatabase(CYDatabase):
             kwargs["h11"] = h12
             kwargs["h12"] = h11
         kwargs["chi"] = None
-        
+
+        # The post-swap ``h12`` dimensions the intersection-number tensor downstream, so a zero
+        # there is fatal rather than merely odd: ``lcs_tree`` builds a (0, 0, 0) array and then
+        # indexes into it, raising a bare ``IndexError`` from inside jaxvacua.  The cicy list's
+        # 22 degenerate "product" entries store h11 = h12 = 0 as a placeholder and hit exactly
+        # this.  Fail here, with the cause named.
+        if int(kwargs["h12"] or 0) <= 0:
+            ident = ", ".join(
+                f"{k}={v}" for k, v in (("cicy_id", cicy_id), ("ks_id", ks_id),
+                                        ("triang_id", triang_id)) if v is not None
+            ) or "this row"
+            extra = "" if self.dataset != "cicy" else (
+                " The CICY list's 22 degenerate 'product' entries store h11 = h12 = 0 as a "
+                "placeholder; they are not loadable models."
+            )
+            raise ValueError(
+                f"{ident} has no Kahler moduli recorded, so its intersection-number tensor is "
+                f"empty and it cannot be built into an lcs_tree.{extra}"
+            )
         if h11 == 0 or h12 == 0:
+            # Loadable, but unusual enough to flag (e.g. no complex-structure moduli).
             warnings.warn(
                 "One of the Hodge numbers is zero, which may lead to "
                 "unexpected behaviour in some JAXVacua computations. "
                 "Proceed with caution."
             )
-        
+
+
         # ---- Optionally fetch conifold data --------------------------------
         # Conifold shards are sharded by *catalog* h11 (the on-disk
         # convention), so use the entry's original h11 before the mirror

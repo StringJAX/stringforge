@@ -152,6 +152,12 @@ _DATASET_CONFIGS: Dict[str, str] = {
     "tdf":        "KS",
     "cicy":       "CICY",
     "kklt":       "KKLT",
+    # ``toric`` is likewise a Kreuzer–Skarke toric hypersurface family, so it shares tdf's
+    # ``model_type`` label (the value is consumed only as ``lcs_tree(model_type=...)``, see
+    # ``lcs_database._parse_lcs_row``).  Unlike the others, toric's catalogue is **sharded**
+    # per h11 with no monolithic ``catalog.parquet`` — see :class:`toric_db.ToricCYDatabase`,
+    # which replaces the catalogue layer rather than extending it.
+    "toric":      "KS",
 }
 
 SCHEMA_VERSION: int = 1
@@ -615,8 +621,18 @@ class CYDatabase:
         if dataset is None:
             dataset = getattr(cls, "_DATASET", "tdf")
         path = Path(path)
-        # If the user passed the sub-dataset directory itself, step up.
-        if path.name == dataset and (path / "catalog.parquet").exists():
+        # If the user passed the sub-dataset directory itself, step up so that
+        # `__init__`'s `cache_dir / dataset` lands back on it.
+        #
+        # The marker must not assume a monolithic `catalog.parquet`: sharded sub-datasets
+        # (`toric`) have no such file, so keying only on it silently resolved
+        # `.../toric` to `.../toric/toric` — and `__init__` then *created* that directory.
+        # `schema.json` is written by every sub-dataset regardless of layout, so accept
+        # either marker; falling back to "the directory is named after the dataset and
+        # holds something" would step up on an empty directory, which is worse.
+        if path.name == dataset and any(
+            (path / marker).exists() for marker in ("catalog.parquet", "schema.json")
+        ):
             path = path.parent
         return cls(
             dataset=dataset,

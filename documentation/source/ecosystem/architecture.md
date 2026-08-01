@@ -10,6 +10,8 @@ StringForge owns shared infrastructure; sibling packages own physics engines.
 | Module | Public symbols | Purpose |
 | --- | --- | --- |
 | [`stringforge.cy_io`](../api/stringforge.cy_io) | `CYDatabase`, `TDFDatabase`, `CICYDatabase` | Pure catalogue I/O, HuggingFace downloads, cache management, schema checks. |
+| [`stringforge.toric_db`](../api/stringforge.toric_db) | `ToricCYDatabase` | Sharded-catalogue I/O for the `toric` sub-dataset (FRST and VEX phases of Kreuzer–Skarke polytopes); local access only for now. |
+| [`stringforge.cy_phase`](../api/stringforge.cy_phase) | `CYPhase`, `ToricCYPhase` | Per-phase geometry objects: stored Wall data immediately, CYTools materialised lazily. |
 | [`stringforge.lcs_database`](../api/stringforge.lcs_database) | `LCSDatabase`, `load_tdf_model`, `load_cicy_model` | Mirror-convention model loading; builds `lcs_tree` or `FluxVacuaFinder` objects when JAXVacua is available. |
 | [`stringforge.kklt_database`](../api/stringforge.kklt_database) | `KKLTDatabase` | Advanced curated `kklt` TDF subset indexed by conifold class, with logical TDF links and curation tags. |
 | [`stringforge.vacua_writer`](../api/stringforge.vacua_writer) | `VacuaWriter` and database delegations | Vacuum-solution persistence, designation, retraction, purge, and HuggingFace vault push/fetch. |

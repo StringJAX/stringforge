@@ -3,12 +3,15 @@
 StringForge provides access to large Calabi-Yau geometry datasets through a
 unified interface.  Data are hosted on HuggingFace and downloaded lazily: the
 constructor performs no network access, catalogue files are fetched on first
-query, and geometry shards are fetched only when a model is loaded.
+query, and geometry shards are fetched only when a model is loaded.  The one
+exception is the `toric` sub-dataset, which is opened from a local build
+(`ToricCYDatabase.from_local`); lazy download of its sharded layout is not yet
+implemented.
 
 ```{important}
 There are three related but distinct layers:
 
-1. **TDF/CICY geometry databases** store Calabi-Yau data.
+1. **TDF/CICY/toric geometry databases** store Calabi-Yau data.
 2. **KKLT curated subset** stores specialised conifold-class provenance and
    logical links back to TDF rows.
 3. **`vacua_vault`** is one shared repository for designated vacuum solutions,
@@ -24,6 +27,12 @@ There are three related but distinct layers:
 - **KKLT index**, an advanced curated TDF subset indexed by conifold class
   with curation tags, through `KKLTDatabase`.  See [KKLT Database](./kklt_database.md)
   after reading this page.
+- **Toric phases** from the Kreuzer-Skarke list at scale, addressed by
+  `(mode, h11, ks_id, triang_id)`, through `ToricCYDatabase`.  `mode` selects FRST
+  classes (fine, regular, star triangulations) or VEX classes (Wall classes of
+  not-necessarily-fine star triangulations).  Unlike the others this sub-dataset is
+  **sharded per `h11`** and, for now, **local only** — see
+  {class}`stringforge.toric_db.ToricCYDatabase`.
 
 Each model may carry topological data, Kähler-cone data, optional GV/GW
 invariants, optional conifold-limit data, and extra precomputed properties.
@@ -40,6 +49,27 @@ from stringforge import TDFDatabase
 
 db = TDFDatabase()
 df = db.query(h11=2)
+```
+
+For the `toric` sub-dataset, open a local build and address a phase by
+`(mode, h11, ks_id, triang_id)`.  `CYPhase` then wraps one row as an object that serves
+the stored geometry without importing CYTools:
+
+```python
+from stringforge import CYPhase, ToricCYDatabase
+
+db = ToricCYDatabase.from_local("/path/to/build")   # the dir containing toric/, or toric/
+df = db.query("frst", h11=4, fav_N=True)
+
+phase = CYPhase.from_database(db, mode="frst", h11=4, ks_id=0, triang_id=0)
+kappa = phase.intersection_numbers(in_basis=True)   # stored; no CYTools import
+chi = phase.euler_characteristic                    # 2 * (h11 - h12)
+```
+
+```{warning}
+`ks_id` is unique only *within* a given `h11`, so all four of
+`(mode, h11, ks_id, triang_id)` are needed to name a phase.  `CYPhase.from_database`
+raises if the key it is given is not unique.
 ```
 
 ### JAXVacua bridge

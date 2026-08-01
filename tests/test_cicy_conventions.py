@@ -125,3 +125,127 @@ def test_tdf_load_is_unaffected_by_the_cicy_fix():
     kappa = np.asarray(tree.intnums)
     assert kappa.shape[0] == len(np.asarray(tree.c2))
     assert tree.gv_charges is not None and tree.gw_charges is not None
+
+
+# ---------------------------------------------------------------------------- #
+# CICYPhase (always run: a stub tree, so neither the build nor jaxvacua is needed)
+# ---------------------------------------------------------------------------- #
+class _StubTree:
+    """The minimal ``lcs_tree`` surface ``CICYPhase.from_row`` reads.
+
+    ``lcs_tree`` is in **mirror** convention, so ``h11`` here is the CY's :math:`h^{2,1}` and
+    ``h12`` -- the Kahler-moduli count that dimensions kappa -- is its :math:`h^{1,1}`.
+    """
+
+    def __init__(self, *, mirror_h11, mirror_h12, intnums_coo, c2, extra_data=None):
+        self.h11 = mirror_h11
+        self.h12 = mirror_h12
+        self.intnums_coo = intnums_coo
+        self.c2 = c2
+        self.extra_data = extra_data
+
+
+def _quintic_stub(**over):
+    """The quintic in P^4 as stored: mirror h11=101, h12=1, kappa=5, c2.J=50."""
+    kw = dict(mirror_h11=101, mirror_h12=1, intnums_coo=[[0, 0, 0, 5]], c2=[50],
+              extra_data={"h11": 1, "h12": 101, "favorable": True,
+                          "Kahler favorable": True, "cicy_id": 7890})
+    kw.update(over)
+    return _StubTree(**kw)
+
+
+def test_cicy_phase_unswaps_the_hodge_labels_and_chi():
+    """The stored labels are mirror-convention; CICYPhase must report the CY's own."""
+    from stringforge import CICYPhase, CYPhase
+
+    p = CICYPhase.from_row(_quintic_stub(), cicy_id=7890)
+    assert isinstance(p, CYPhase) and p.construction == "cicy"
+    assert (p.h11, p.h12) == (1, 101), "labels must be un-swapped relative to the store"
+    assert p.euler_characteristic == -200, "chi sign must follow the CY, not the catalogue"
+    assert p.basis_rank == 1 and p.basis_is_complete is True
+    assert p.to_dense().shape == (1, 1, 1)
+    assert int(p.to_dense()[0, 0, 0]) == 5
+    assert list(p.second_chern_class()) == [50]
+
+
+def test_cicy_phase_has_no_wall_hash_and_no_in_basis():
+    """No basis identification exists for cicy, so neither may be offered."""
+    from stringforge import CICYPhase
+
+    p = CICYPhase.from_row(_quintic_stub(), cicy_id=7890)
+    assert not hasattr(p, "wall_hash"), "a cicy wall_hash would be uncomparable"
+    for call in (lambda: p.intersection_numbers(in_basis=True),
+                 lambda: p.second_chern_class(in_basis=True)):
+        with pytest.raises(NotImplementedError):
+            call()
+
+
+def test_cicy_phase_flags_an_incomplete_basis():
+    """len(c2) < h11(X): the stored classes span only a subspace of H^{1,1}(X)."""
+    from stringforge import CICYPhase
+
+    p = CICYPhase.from_row(_quintic_stub(
+        mirror_h11=15, mirror_h12=15, intnums_coo=[[0, 0, 0, 1]], c2=[1] * 7,
+        extra_data={"h11": 15, "h12": 15, "Kahler favorable": False, "favorable": False},
+    ), cicy_id=1)
+    assert (p.h11, p.h12) == (15, 15) and p.euler_characteristic == 0
+    assert p.basis_rank == 7 < p.h11
+    assert p.basis_is_complete is False
+
+
+def test_cicy_phase_rejects_the_degenerate_product_rows():
+    """The 22 'product' entries store h11 = h12 = 0, which is not a CY threefold."""
+    from stringforge import CICYPhase
+
+    with pytest.raises(ValueError, match="not a valid Calabi-Yau"):
+        CICYPhase.from_row(_quintic_stub(
+            mirror_h11=0, mirror_h12=0, intnums_coo=[[0, 1, 1, 12]], c2=[72, 0],
+            extra_data={"h11": 0, "h12": 0, "product": True},
+        ), cicy_id=31)
+
+
+def test_cicy_phase_refuses_a_flag_contradicted_by_the_data():
+    """Kahler favorable requires len(c2) == h11(X); a mismatch must not pass silently."""
+    from stringforge import CICYPhase
+
+    with pytest.raises(ValueError, match="contradicts the flag"):
+        CICYPhase.from_row(_quintic_stub(
+            mirror_h11=101, mirror_h12=4, intnums_coo=[[0, 0, 0, 5]], c2=[50],
+            extra_data={"h11": 4, "h12": 101, "Kahler favorable": True},
+        ), cicy_id=-1)
+
+
+def test_cicy_phase_refuses_a_contradictory_stored_convention():
+    """extra_data is the un-swapped truth; if it disagrees with the swap, do not guess."""
+    from stringforge import CICYPhase
+
+    with pytest.raises(ValueError, match="Refusing to guess the convention"):
+        CICYPhase.from_row(_quintic_stub(
+            extra_data={"h11": 77, "h12": 101, "Kahler favorable": True},
+        ), cicy_id=7890)
+
+
+def test_cicy_phase_rejects_a_catalogue_only_database():
+    """CICYDatabase has no load(); the error must name the right replacement."""
+    from stringforge import CICYDatabase, CICYPhase
+
+    db = CICYDatabase.__new__(CICYDatabase)      # no I/O; only .dataset is consulted
+    db.dataset = "cicy"
+    with pytest.raises(TypeError, match="catalogue-only"):
+        CICYPhase.from_database(db, cicy_id=7890)
+
+
+def test_cicy_phase_is_registered_for_base_class_dispatch():
+    from stringforge import CYPhase
+
+    assert CYPhase._DB_DISPATCH == {"toric": "ToricCYPhase", "cicy": "CICYPhase"}
+
+
+def test_zero_kahler_moduli_load_raises_a_clear_error():
+    """A degenerate row must not reach jaxvacua, where it raises a bare IndexError."""
+    import os
+
+    if not os.path.isdir(os.path.join(_LOCAL, "cicy")):
+        pytest.skip("local cicy build not present")
+    with pytest.raises(ValueError, match="no Kahler moduli recorded"):
+        _db("cicy").load(cicy_id=31)

@@ -10,6 +10,8 @@ calculations live in sibling packages such as JAXVacua.
    :hidden:
 
    stringforge.cy_io
+   stringforge.toric_db
+   stringforge.cy_phase
    stringforge.lcs_database
    stringforge.kklt_database
    stringforge.vacua_writer
@@ -27,6 +29,10 @@ Workflow entry points
      - Start here
    * - Query TDF/CICY catalogues without constructing physics models.
      - :class:`stringforge.cy_io.CYDatabase`, :class:`stringforge.cy_io.TDFDatabase`, :class:`stringforge.cy_io.CICYDatabase`.
+   * - Query Kreuzer–Skarke toric CY phases (FRST and VEX classes) at scale.
+     - :class:`stringforge.toric_db.ToricCYDatabase` — sharded per :math:`h^{1,1}`, so point lookups stay :math:`O(1)`.
+   * - Work with one Calabi–Yau phase as an object (stored geometry now, CYTools on demand).
+     - :class:`stringforge.cy_phase.CYPhase`, :class:`stringforge.cy_phase.ToricCYPhase`.
    * - Load catalogue rows as JAXVacua-compatible data or models.
      - :class:`stringforge.lcs_database.LCSDatabase` — :meth:`~stringforge.lcs_database.LCSDatabase.load`, :meth:`~stringforge.lcs_database.LCSDatabase.load_model`, :meth:`~stringforge.lcs_database.LCSDatabase.load_batch`, :meth:`~stringforge.lcs_database.LCSDatabase.iter_batch`, :meth:`~stringforge.lcs_database.LCSDatabase.sample`.
    * - Work with the advanced KKLT index.
@@ -42,6 +48,8 @@ Module pages
 ------------
 
 * :doc:`stringforge.cy_io`
+* :doc:`stringforge.toric_db`
+* :doc:`stringforge.cy_phase`
 * :doc:`stringforge.lcs_database`
 * :doc:`stringforge.kklt_database`
 * :doc:`stringforge.vacua_writer`

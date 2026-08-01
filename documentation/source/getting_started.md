@@ -31,6 +31,7 @@ backend on Mac.
 | Layer | Owned by | Typical entry points |
 | --- | --- | --- |
 | Pure catalogue I/O | StringForge | `CYDatabase`, `TDFDatabase`, `CICYDatabase` |
+| Toric CY phases (FRST / VEX) at scale | StringForge | `ToricCYDatabase`, `CYPhase`, `ToricCYPhase` |
 | JAXVacua model loading | StringForge bridge | `LCSDatabase.load`, `LCSDatabase.load_model` |
 | Vacuum-solution persistence | StringForge | `VacuaWriter`, `designate_vacua`, `vacuavault` |
 | Cluster production runs and ML-ready datasets | StringForge | `Vulcan`, `VulcanReader`, `VulcanMLView`, `python -m stringforge.vulcan` |
