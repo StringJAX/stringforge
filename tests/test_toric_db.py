@@ -33,10 +33,12 @@ from stringforge.cy_io import SchemaVersionError
 from stringforge.toric_normalize import TORIC_SCHEMA_VERSION
 
 H11 = 2
-# two polytopes: ks_id 0 favorable (basis_dim == h11), ks_id 1 NON-favorable (basis_dim < h11)
+# Schema 3. ks_id 0 is favorable: cy_basis == the ambient basis, every divisor irreducible.
+# ks_id 1 is NON-favorable: basis_dim=1 < h11=2, so one prime toric divisor splits into two
+# components and `cy_basis` picks up the extra one. Both therefore have len(cy_basis) == h11.
 _POLYS = [
-    dict(ks_id=0, h12=29, fav_N=True, basis_dim=2, n_classes=2),
-    dict(ks_id=1, h12=30, fav_N=False, basis_dim=1, n_classes=1),
+    dict(ks_id=0, h12=29, fav_N=True, basis_dim=2, n_classes=2, split=None),
+    dict(ks_id=1, h12=30, fav_N=False, basis_dim=1, n_classes=1, split=1),
 ]
 
 
@@ -58,6 +60,7 @@ def toric_root(tmp_path):
          "modes": ["frst", "vex"], "convention": "prime-toric-0indexed-v1"}))
 
     pcat, poly, cat, geom, pidx, cidx = [], [], [], [], [], []
+    ncomp_of = {}
     crow = 0
     for p in _POLYS:
         oob = p["basis_dim"] + 4
@@ -66,11 +69,23 @@ def toric_root(tmp_path):
                          trilayer=True, n_rigids=0, n_rigids_dual=0, n_frsts=p["n_classes"],
                          n_ntfe_frsts=None, n_frst_classes=p["n_classes"],
                          oob_dim=oob, basis_dim=p["basis_dim"]))
+        # n_components: 1 per prime toric divisor, except the split one
+        ncomp = [1] * (oob if p["split"] is None else oob - 1)
+        if p["split"] is not None:
+            ncomp[p["split"]] = 2
+        # cy_basis = ambient sub-basis, then the extra components -> len == h11
+        cy_basis = list(range(p["basis_dim"]))
+        if p["split"] is not None:
+            cy_basis += [sum(ncomp[:p["split"]]) + 1]
         poly.append(dict(h11=H11, ks_id=p["ks_id"], polytope_hash=f"hash{p['ks_id']}",
                          vertices=[[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0],
                                    [0, 0, 0, 1], [-1, -1, -1, -1]],
-                         glsm_basis=list(range(p["basis_dim"])),
-                         glsm_charge_matrix=[[1] * oob]))
+                         cy_basis=cy_basis, n_components=ncomp,
+                         # (basis_dim, n_prime): one ROW per ambient basis element,
+                         # matching the real data (measured (5, 10) at h11=6)
+                         glsm_charge_matrix=[[1] * len(ncomp)
+                                             for _ in range(p["basis_dim"])]))
+        ncomp_of[p["ks_id"]] = ncomp
         pidx.append(dict(ks_id=p["ks_id"], part=0, row0=len(pcat) - 1, n=1))
         cidx.append(dict(ks_id=p["ks_id"], part=0, row0=crow, n=p["n_classes"]))
         for t_id in range(p["n_classes"]):
@@ -80,7 +95,12 @@ def toric_root(tmp_path):
             geom.append(dict(h11=H11, ks_id=p["ks_id"], triang_id=t_id,
                              heights=[1.0] * oob,
                              intnums_coo_i=[0], intnums_coo_j=[0], intnums_coo_k=[0],
-                             intnums_coo_v=[5 + t_id], c2=[10 + t_id] * oob, c2_origin=-62))
+                             intnums_coo_v=[5 + t_id],
+                             # one entry per UNFOLDED divisor (sum), not per prime
+                             # toric divisor (len) -- the split row has 4 primes
+                             # but 5 components.
+                             c2=[10 + t_id] * sum(ncomp_of[p["ks_id"]]),
+                             c2_origin=-62))
             crow += 1
 
     for split, rows in (("polytope_catalog", pcat), ("polytope", poly),
@@ -229,16 +249,55 @@ def test_incomplete_key_is_rejected(toric_root):
         CYPhase.from_database(db, mode="frst", h11=H11, ks_id=0, triang_id=0, h12=999)
 
 
-def test_non_favorable_flags_incomplete_basis_and_defers_full_h11(toric_root):
+def test_non_favorable_phase_is_now_complete(toric_root):
+    """Schema 3: a non-favorable polytope's stored geometry spans all of H^(1,1)(X).
+
+    Before the unfolding, in-basis access here returned only the ``basis_dim`` toric classes
+    and warned. Now ``cy_basis`` covers h11, so the geometry is complete and the warning would
+    be false. ``fav_N`` still records that the *polytope* is non-favorable — a property of the
+    geometry, not of the stored data — which is the distinction this pins.
+    """
     db = ToricCYDatabase.from_local(str(toric_root))
     cp = CYPhase.from_database(db, "frst", H11, 1, 0)          # ks_id 1 is fav_N=False
-    assert cp.basis_is_complete is False and cp.covers_full_h11 is False
-    assert cp.basis_rank == 1 < cp.h11
-    with pytest.warns(UserWarning, match="non-favorable"):
-        cp.intersection_numbers(in_basis=True)                 # toric part only, with a warning
-    for name in ("full_intersection_numbers", "full_second_chern_class"):
-        with pytest.raises(NotImplementedError):
-            getattr(cp, name)()
+    assert cp.fav_N is False, "the polytope is still non-favorable"
+    assert cp.covers_full_h11 is True and cp.basis_is_complete is True
+    assert len(cp.cy_basis) == cp.h11 == H11
+    assert cp.basis_dim == 1 < cp.h11, "the AMBIENT basis is still smaller than h11"
+
+    # in-basis now spans h11, and does not warn
+    import warnings as _w
+    with _w.catch_warnings():
+        _w.simplefilter("error")
+        assert len(cp.second_chern_class(in_basis=True)) == H11
+        assert np.asarray(cp.intersection_numbers(in_basis=True)).shape[1] == 4
+        # full_* are plain aliases now -- they must not raise
+        assert np.asarray(cp.full_intersection_numbers()).shape[1] == 4
+        assert len(cp.full_second_chern_class()) == H11
+
+
+def test_ambient_basis_is_the_cy_basis_prefix(toric_root):
+    """`glsm_charge_matrix` rows are indexed by cy_basis[:basis_dim], not by all of cy_basis."""
+    db = ToricCYDatabase.from_local(str(toric_root))
+    for ks in (0, 1):
+        cp = CYPhase.from_database(db, "frst", H11, ks, 0)
+        assert cp.glsm_basis == cp.cy_basis[:cp.basis_dim]
+        assert len(cp.glsm_basis) == cp.glsm_charge_matrix.shape[0], (
+            "charge-matrix rows must match the ambient sub-basis")
+    fav = CYPhase.from_database(db, "frst", H11, 0, 0)
+    assert fav.glsm_basis == fav.cy_basis, "favorable: the two bases coincide"
+
+
+def test_short_cy_basis_is_rejected(toric_root):
+    """A row from before the unfolding must fail loudly, not silently give a partial geometry."""
+    db = ToricCYDatabase.from_local(str(toric_root))
+    g = db.load("frst", H11, 1, 0)
+    poly = db.get_polytope(h11=H11, ks_id=1)
+    with pytest.raises(ValueError, match="must span"):
+        ToricCYPhase(mode="frst", h11=H11, h12=30, ks_id=1, triang_id=0, heights=g["heights"],
+                     intnums_coo=g["intnums_coo"], c2=g["c2"], c2_origin=g["c2_origin"],
+                     vertices=poly["vertices"], cy_basis=poly["cy_basis"][:1],   # too short
+                     glsm_charge_matrix=poly["glsm_charge_matrix"], fav_N=False, fav_M=True,
+                     trilayer=True, wall_hash=g["wall_hash"], polytope_hash=poly["polytope_hash"])
 
 
 def test_legacy_constructor_form_still_dispatches(toric_root):
@@ -249,7 +308,7 @@ def test_legacy_constructor_form_still_dispatches(toric_root):
     cp = CYPhase(
         dataset="frst", h11=H11, h12=29, ks_id=0, triang_id=0, heights=g["heights"],
         intnums_coo=g["intnums_coo"], c2=g["c2"], c2_origin=g["c2_origin"],
-        vertices=poly["vertices"], glsm_basis=poly["glsm_basis"],
+        vertices=poly["vertices"], cy_basis=poly["cy_basis"],
         glsm_charge_matrix=poly["glsm_charge_matrix"], fav_N=True, fav_M=True,
         trilayer=True, wall_hash=g["wall_hash"], polytope_hash=poly["polytope_hash"],
     )

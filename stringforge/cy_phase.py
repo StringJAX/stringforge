@@ -2,7 +2,7 @@ r"""
 ``CYPhase`` — per-phase Calabi–Yau objects for the cy-database.
 
 A small class family: a construction-independent base plus one subclass per construction
-(currently :class:`ToricCYPhase` for the FRST / VEX toric sub-dataset).
+(currently :class:`ToricCYPhase` for the FRST / vex toric sub-dataset).
 
 While :class:`stringforge.toric_db.ToricCYDatabase` is the *I/O* layer (query the catalogues,
 ``load`` a phase's geometry into a ``dict``), ``CYPhase`` is the *object* layer:
@@ -33,12 +33,12 @@ adds the polytope layer, the out-of-basis/in-basis machinery and the CYTools bri
 Instantiating ``CYPhase`` with toric arguments returns a ``ToricCYPhase``, so the legacy
 call form and :meth:`CYPhase.from_database` are unchanged.
 
-**FRST vs VEX (one toric class).** ``mode`` distinguishes FRST (``cytools.CalabiYau``
-classes) from VEX (Wall classes, toric fans).  :meth:`ToricCYPhase.to_cytools` returns
-a ``cytools.CalabiYau`` for FRST but a CYTools ``Fan`` for VEX (there is no
-``.cy()`` for a VEX phase); consequently the ``CalabiYau``-only features — GV
+**FRST vs vex (one toric class).** ``mode`` distinguishes FRST (``cytools.CalabiYau``
+classes) from vex (Wall classes, toric fans).  :meth:`ToricCYPhase.to_cytools` returns
+a ``cytools.CalabiYau`` for FRST but a CYTools ``Fan`` for vex (there is no
+``.cy()`` for a vex phase); consequently the ``CalabiYau``-only features — GV
 invariants, ``mori_cone(version="cap")``, ``kahler_cone(version="cup")`` and
-:meth:`ToricCYPhase.to_lcs_tree` — are unavailable for VEX and raise
+:meth:`ToricCYPhase.to_lcs_tree` — are unavailable for vex and raise
 ``NotImplementedError``.
 
 Example::
@@ -79,7 +79,7 @@ def _require_cytools() -> Any:
     r"""
     **Description:**
     Import and return the ``cytools`` module with experimental features enabled
-    (required for the VEX ``vc()`` / ``Fan`` path), raising a clear error if
+    (required for the vex ``vc()`` / ``Fan`` path), raising a clear error if
     ``cytools`` is absent.
     """
     try:
@@ -183,7 +183,7 @@ class CYPhase:
     #: ``CYPhase(...)`` dispatch to :class:`ToricCYPhase` (back-compatibility with the
     #: pre-split 17-argument constructor).
     _TORIC_ONLY_KWARGS = frozenset({
-        "dataset", "mode", "ks_id", "triang_id", "heights", "vertices", "glsm_basis",
+        "dataset", "mode", "ks_id", "triang_id", "heights", "vertices", "cy_basis",
         "glsm_charge_matrix", "fav_N", "fav_M", "trilayer", "polytope_hash", "c2_origin",
         "oob_dim", "basis_dim", "phase_id", "wall_hash",
     })
@@ -359,12 +359,12 @@ class CYPhase:
 class ToricCYPhase(CYPhase):
     r"""
     **Description:**
-    One Calabi–Yau phase from the FRST / VEX cy-database.
+    One Calabi–Yau phase from the FRST / vex cy-database.
 
     A ``CYPhase`` carries the stored (normalized, prime-toric 0-indexed) geometry
     of a single phase and exposes it through a numpy fast-path, while lazily
     materialising a CYTools object for cone / GV computations.  See the module
-    docstring for the two-speed design and the FRST/VEX differences.
+    docstring for the two-speed design and the FRST/vex differences.
 
     Args:
         dataset (str): ``"frst"`` or ``"vex"``.
@@ -373,14 +373,16 @@ class ToricCYPhase(CYPhase):
             spelled :math:`h^{2,1}` throughout this module and in the stored columns).
         ks_id (int): Canonical Kreuzer–Skarke polytope index.
         triang_id (int): Phase (class) index within the polytope.
-        heights (Sequence[float]): Triangulation heights (stored verbatim; VEX
+        heights (Sequence[float]): Triangulation heights (stored verbatim; vex
             heights may be non-integer).
         intnums_coo (ArrayLike): Out-of-basis κ as COO triples ``(nnz, 4)`` in the
             normalized (prime-toric 0-indexed) convention.
         c2 (Sequence[int]): Out-of-basis c₂ (length ``oob_dim``), normalized.
-        c2_origin (int | None): FRST origin-divisor c₂ value (``None`` for VEX).
+        c2_origin (int | None): FRST origin-divisor c₂ value (``None`` for vex).
         vertices (ArrayLike): Polytope vertices.
-        glsm_basis (Sequence[int]): GLSM basis positions (0-indexed).
+        cy_basis (Sequence[int]): Basis of :math:`H^{1,1}(X)` as 0-indexed positions into
+            the (unfolded) divisor list; ``len == h11``. The ambient GLSM sub-basis is its
+            first ``basis_dim`` entries — see :attr:`glsm_basis`.
         glsm_charge_matrix (ArrayLike): GLSM charge matrix of the polytope.
         fav_N (bool): Whether the polytope is favorable.
         fav_M (bool): Whether the mirror polytope is favorable.
@@ -390,8 +392,8 @@ class ToricCYPhase(CYPhase):
         polytope_hash (str): ``sha256(repr(normal_form))`` content hash.
         oob_dim (int | None): Out-of-basis dimension ``= Ntor``.  Defaults to
             ``len(c2)``.
-        basis_dim (int | None): ``len(glsm_basis)`` (``= h11`` iff favorable).
-            Defaults to ``len(glsm_basis)``.
+        basis_dim (int | None): Size of the **ambient** GLSM sub-basis, ``h11(V)``
+            (``= h11`` iff favorable). Defaults to ``len(cy_basis)``.
         phase_id (str | None): ``"{dataset}:{h11}:{ks_id}:{triang_id}"``.
             Computed if omitted.
 
@@ -412,7 +414,8 @@ class ToricCYPhase(CYPhase):
         intnums_coo: Any,
         c2: Any,
         vertices: Any,
-        glsm_basis: Any,
+        cy_basis: Any,
+        n_components: Any = None,
         glsm_charge_matrix: Any,
         fav_N: bool,
         fav_M: bool,
@@ -444,18 +447,50 @@ class ToricCYPhase(CYPhase):
 
         # polytope-level data (needed before super().__init__ so basis_dim can default)
         self.vertices = np.asarray(vertices)
-        self.glsm_basis = [int(x) for x in glsm_basis]
+        # Schema 3 stores ONE basis column. `cy_basis` spans H^{1,1}(X), so len == h11 even
+        # when the polytope is non-favorable; the ambient GLSM sub-basis is the first
+        # `basis_dim` entries (see `glsm_basis`).
+        self.cy_basis = [int(x) for x in cy_basis]
+        #: components per prime toric divisor (all 1 when favorable). Needed to contract the
+        #: unfolded geometry back to the ambient one, which is what CYTools returns.
+        self.n_components = ([int(x) for x in n_components] if n_components is not None
+                             else None)
         self.glsm_charge_matrix = np.asarray(glsm_charge_matrix)
         self.fav_N = bool(fav_N)
         self.fav_M = bool(fav_M)
         self.trilayer = bool(trilayer)
-        self.basis_dim = int(basis_dim) if basis_dim is not None else len(self.glsm_basis)
+        self.basis_dim = int(basis_dim) if basis_dim is not None else len(self.cy_basis)
+        # `cy_basis` lives in the SHARED polytope layer, but a phase layer may or may not have
+        # been unfolded (vex is still blocked -- see NONFAVORABLE_MIGRATION_PLAN.md §8 R1). Decide
+        # per phase from the geometry itself: an unfolded row has one c2 entry per *unfolded*
+        # divisor, an un-migrated one has a single entry per prime toric divisor. Slicing an
+        # un-migrated row with the (longer) cy_basis would index past the end.
+        n_prime = len(self.n_components) if self.n_components else None
+        n_unfolded = sum(self.n_components) if self.n_components else None
+        n_c2 = len(np.asarray(c2))
+        if n_unfolded is not None and n_c2 == n_prime != n_unfolded:
+            prime_of = [i for i, n in enumerate(self.n_components) for _ in range(int(n))]
+            self._slice_basis = [prime_of[b] for b in self.cy_basis[:self.basis_dim]]
+            self._geometry_is_unfolded = False
+        else:
+            self._slice_basis = list(self.cy_basis)
+            self._geometry_is_unfolded = True
+            if len(self.cy_basis) != int(h11):
+                raise ValueError(
+                    f"cy_basis has {len(self.cy_basis)} entries but h11={h11}; it must span "
+                    f"H^(1,1)(X). A shorter basis means this row predates schema 3 (the "
+                    f"non-favorable unfolding) — re-run the migration for this bucket."
+                )
 
-        # universal Wall data.  `basis_is_complete` is exactly toric favourability: for
-        # fav_N=False the stored geometry spans only the basis_dim toric classes of h11.
+        # For a favorable polytope, and for a non-favorable one whose geometry was unfolded,
+        # the stored data spans all of H^{1,1}(X) and `basis_is_complete` is True. It is False
+        # only for a phase left ambient because its stored geometry did not satisfy the
+        # unfolding's premise (see the detection above and NONFAVORABLE_MIGRATION_PLAN.md §8 R1). `fav_N` separately records whether the
+        # *polytope* was favorable — a property of the geometry, not of the stored data.
         super().__init__(
             construction="toric", h11=h11, h12=h12, intnums_coo=intnums_coo, c2=c2,
-            basis_rank=self.basis_dim, basis_is_complete=bool(fav_N), chi=chi,
+            basis_rank=len(self._slice_basis),
+            basis_is_complete=(len(self._slice_basis) == int(h11)), chi=chi,
         )
 
         self.ks_id = int(ks_id)
@@ -471,7 +506,13 @@ class ToricCYPhase(CYPhase):
         self.phase_id = phase_id or nz.phase_id(mode, h11, ks_id, triang_id)
 
         # dimensions
-        self.oob_dim = int(oob_dim) if oob_dim is not None else int(self._c2.shape[0])
+        # `oob_dim` is stored once per polytope in the SHARED `polytope_catalog`, so it
+        # records the *unfolded* length. A phase whose geometry was not unfolded (a
+        # un-unfolded vex phase — see NONFAVORABLE_MIGRATION_PLAN.md §8 R1) still stores the
+        # shorter ambient vector, and trusting the shared value would make `to_dense()` pad the
+        # tensor with a meaningless zero slice. The stored geometry is the authority.
+        self.oob_dim = (int(oob_dim) if oob_dim is not None and self._geometry_is_unfolded
+                        else int(self._c2.shape[0]))
 
         # lazy CYTools backing field (materialised by :meth:`to_cytools`)
         self._cy: Any = None
@@ -553,7 +594,8 @@ class ToricCYPhase(CYPhase):
             c2=geom["c2"],
             c2_origin=geom["c2_origin"],
             vertices=poly["vertices"],
-            glsm_basis=poly["glsm_basis"],
+            cy_basis=poly["cy_basis"],
+            n_components=poly.get("n_components"),
             glsm_charge_matrix=poly["glsm_charge_matrix"],
             fav_N=poly["fav_N"],
             fav_M=poly["fav_M"],
@@ -588,10 +630,11 @@ class ToricCYPhase(CYPhase):
         h11 = int(polytope_row.get("h11", geom_row["h11"]))
         h12 = int(geom_row["h12"])
         c2 = geom_row["c2"]
-        glsm_basis = polytope_row["glsm_basis"]
+        cy_basis = polytope_row["cy_basis"]
         wall_hash = geom_row.get("wall_hash", polytope_row.get("wall_hash"))
         if wall_hash is None:                       # E2: compute it (we have the normalized geometry)
-            wall_hash = nz.wall_hash_digest(h11, h12, coo, c2, glsm_basis)
+            # over cy_basis, matching how the build computes it since schema 3
+            wall_hash = nz.wall_hash_digest(h11, h12, coo, c2, cy_basis)
         return cls(
             dataset=dataset,
             h11=h11,
@@ -603,7 +646,7 @@ class ToricCYPhase(CYPhase):
             c2=c2,
             c2_origin=geom_row.get("c2_origin"),
             vertices=polytope_row["vertices"],
-            glsm_basis=glsm_basis,
+            cy_basis=cy_basis,
             glsm_charge_matrix=polytope_row["glsm_charge_matrix"],
             fav_N=polytope_row["fav_N"],
             fav_M=polytope_row["fav_M"],
@@ -649,9 +692,9 @@ class ToricCYPhase(CYPhase):
         """
         if in_basis:
             self._warn_if_incomplete_basis("intersection numbers")
-            rows, _ = nz.in_basis_from_stored(self._coo, self._c2, self.glsm_basis)
+            rows, _ = nz.in_basis_from_stored(self._coo, self._c2, self._slice_basis)
             coo = np.asarray(rows, dtype=int).reshape(-1, 4)
-            n = self.basis_dim
+            n = len(self._slice_basis)
         else:
             coo = self._coo
             n = self.oob_dim
@@ -701,7 +744,7 @@ class ToricCYPhase(CYPhase):
         """
         if in_basis:
             self._warn_if_incomplete_basis("second Chern class")
-            _, c2_ib = nz.in_basis_from_stored(self._coo, self._c2, self.glsm_basis)
+            _, c2_ib = nz.in_basis_from_stored(self._coo, self._c2, self._slice_basis)
             return np.asarray(c2_ib, dtype=int)
         return np.asarray(self._c2, dtype=int)
 
@@ -726,15 +769,26 @@ class ToricCYPhase(CYPhase):
         **Description:**
         Whether the stored geometry spans **all** of :math:`H^{1,1}(X)`.
 
-        ``True`` iff the polytope is favorable (``fav_N``). For a **non-favorable**
-        polytope ``h11(X) > h11(V)``: some prime toric divisors are reducible (a
-        2-face divisor splits into ``g+1`` irreducible components on :math:`X`), so
-        the stored κ/c₂ cover only the ``basis_dim = h11(V)`` toric classes and the
-        remaining ``h11 - basis_dim`` non-toric classes are **not** represented. Full
-        :math:`h^{1,1}(X)` support (unfolding the reducible divisors) is deferred —
-        see :meth:`full_intersection_numbers`.
+        Since schema 3 this is ``True`` for every phase.  Reducible prime toric divisors of a
+        non-favorable polytope are unfolded into their components at build time, so
+        ``cy_basis`` spans :math:`H^{1,1}(X)` regardless of favourability.  Use :attr:`fav_N`
+        to ask whether the *polytope* is favorable — a property of the geometry — rather than
+        this, which asks whether the *stored data* is complete.
         """
-        return bool(self.fav_N)
+        return len(self._slice_basis) == self.h11
+
+    @property
+    def glsm_basis(self) -> List[int]:
+        r"""
+        **Description:**
+        The **ambient** GLSM sub-basis: the first :attr:`basis_dim` entries of
+        :attr:`cy_basis`.
+
+        This is what indexes the rows of :attr:`glsm_charge_matrix` — *not* all of
+        ``cy_basis``, which for a non-favorable polytope is longer.  Equal to ``cy_basis``
+        exactly when the polytope is favorable.
+        """
+        return self.cy_basis[:self.basis_dim]
 
     @property
     def dataset(self) -> str:
@@ -758,24 +812,40 @@ class ToricCYPhase(CYPhase):
         r"""
         **Description:**
         The equivalence used to define this phase's class: ``"cy-class"`` (FRST,
-        CYTools ``cy()``-equivalence) or ``"wall-class"`` (VEX, in-basis (κ, c₂)
+        CYTools ``cy()``-equivalence) or ``"wall-class"`` (vex, in-basis (κ, c₂)
         Wall-data dedup).
         """
         return "cy-class" if self.mode == "frst" else "wall-class"
 
     def _warn_if_incomplete_basis(self, what: str) -> None:
-        """Warn once per instance if this non-favorable phase's in-basis geometry
-        covers only the toric subspace (``basis_dim < h11``)."""
-        if not self.fav_N and not self._warned_nonfav:
+        """Retained as a guard, but silent on a schema-3 database.
+
+        Before the non-favorable unfolding, in-basis access on a ``fav_N=False`` phase returned
+        only the toric subspace and warned.  That geometry is now complete, so the warning would
+        be false.  It still fires if a row somehow carries a short ``cy_basis``, which would mean
+        an un-migrated bucket.
+        """
+        if len(self._slice_basis) < self.h11 and not self._warned_nonfav:
             self._warned_nonfav = True
             warnings.warn(
-                f"CYPhase {self.phase_id}: non-favorable polytope (fav_N=False) — the "
-                f"in-basis {what} spans only the {self.basis_dim} toric H^(1,1) classes "
-                f"of h11={self.h11}; the {self.h11 - self.basis_dim} non-toric classes "
-                f"(reducible 2-face divisors) are not stored. Full h11(X) support is "
-                f"deferred — see CYPhase.covers_full_h11 / full_intersection_numbers().",
+                f"CYPhase {self.phase_id}: the stored geometry spans only "
+                f"{len(self._slice_basis)} of "
+                f"h11={self.h11} classes, so the in-basis {what} is incomplete. This row "
+                f"predates the non-favorable unfolding — re-run the migration.",
                 UserWarning,
                 stacklevel=3,
+            )
+
+    def _require_full_h11(self, what: str) -> None:
+        """Refuse an operation that promises full H^(1,1)(X) when the geometry is truncated."""
+        if not self.covers_full_h11:
+            raise NotImplementedError(
+                f"{what}() needs geometry spanning all of H^(1,1)(X), but this phase stores the "
+                f"ambient truncation ({self.basis_rank} of h11={self.h11} classes). Splitting its "
+                f"reducible divisor into components requires chi(O_D) = g+1, which is measurably "
+                f"false for this phase, so the unfolding was deliberately not applied rather than "
+                f"fabricate geometry. Use intersection_numbers(in_basis=True) for the truncation; "
+                f"see NONFAVORABLE_MIGRATION_PLAN.md §8 R1."
             )
 
     def full_intersection_numbers(self, format: str = "coo") -> np.ndarray:
@@ -784,29 +854,24 @@ class ToricCYPhase(CYPhase):
         Triple intersection numbers over the **full** :math:`H^{1,1}(X)` basis
         (dimension ``h11``).
 
-        For **favorable** phases this equals :meth:`intersection_numbers` with
-        ``in_basis=True``. For **non-favorable** phases it requires unfolding the
-        reducible 2-face divisors into their ``h11(X)+4`` irreducible components,
-        which is **not yet implemented** (deferred; the stored data covers only the
-        ``basis_dim`` toric classes).
+        This equals :meth:`intersection_numbers` with ``in_basis=True`` whenever the
+        stored geometry spans all of :math:`H^{1,1}(X)` — always for favorable
+        polytopes, and for non-favorable ones whose reducible 2-face divisors were
+        unfolded into their irreducible components (arXiv:1712.04946).
 
         Args:
-            format (str): ``"coo"`` or ``"dense"`` (favorable case only).
+            format (str): ``"coo"`` or ``"dense"``.
 
         Returns:
-            np.ndarray: κ over the full ``h11``-dimensional basis (favorable only).
+            np.ndarray: κ over the full ``h11``-dimensional basis.
 
         Raises:
-            NotImplementedError: For a non-favorable phase (:attr:`covers_full_h11`
-                is ``False``).
+            NotImplementedError: If the stored geometry is the ambient truncation
+                (:attr:`covers_full_h11` is ``False``). This happens for a non-favorable
+                **vex** phase whose reducible divisor does not satisfy
+                :math:`\chi(\mathcal{O}_D) = g+1`, the premise the component split needs.
         """
-        if not self.covers_full_h11:
-            raise NotImplementedError(
-                f"CYPhase {self.phase_id}: full h11(X)={self.h11} intersection numbers "
-                f"for a non-favorable polytope require unfolding reducible 2-face "
-                f"divisors (h11(X) > h11(V)={self.basis_dim}); this is deferred. Use "
-                f"intersection_numbers(in_basis=True) for the {self.basis_dim}-dim toric part."
-            )
+        self._require_full_h11("full_intersection_numbers")
         return self.intersection_numbers(in_basis=True, format=format)
 
     def full_second_chern_class(self) -> np.ndarray:
@@ -822,12 +887,8 @@ class ToricCYPhase(CYPhase):
         Raises:
             NotImplementedError: For a non-favorable phase.
         """
-        if not self.covers_full_h11:
-            raise NotImplementedError(
-                f"CYPhase {self.phase_id}: full h11(X) second Chern class for a "
-                f"non-favorable polytope is deferred (needs 2-face divisor unfolding). "
-                f"Use second_chern_class(in_basis=True) for the toric part."
-            )
+
+        self._require_full_h11("full_second_chern_class")
         return self.second_chern_class(in_basis=True)
 
     # -- CYTools fallback (lazy import INSIDE) -------------------------------- #
@@ -838,12 +899,12 @@ class ToricCYPhase(CYPhase):
 
         **FRST** returns a ``cytools.CalabiYau``
         (``Polytope(vertices, deterministic_glsm_basis=True).triangulate(heights).cy()``).
-        **VEX** returns a CYTools ``Fan``
+        **vex** returns a CYTools ``Fan``
         (``Polytope(...).vc().triangulate(heights)`` — a not-necessarily-fine star
         triangulation, with *no* ``.cy()``) and emits a ``UserWarning``: the
         ``CalabiYau``-only features (GV invariants, ``mori_cone(version="cap")``,
         ``kahler_cone(version="cup")``, :meth:`to_lcs_tree`) are unavailable for
-        VEX and raise ``NotImplementedError``.  The stored fast-path attributes
+        vex and raise ``NotImplementedError``.  The stored fast-path attributes
         remain valid regardless.
 
         Returns:
@@ -857,11 +918,11 @@ class ToricCYPhase(CYPhase):
                 self._cy = p.triangulate(heights=self.heights).cy()
             else:  # vex
                 warnings.warn(
-                    "CYPhase.to_cytools(): for a VEX phase this returns a CYTools "
+                    "CYPhase.to_cytools(): for a vex phase this returns a CYTools "
                     "`Fan` (from `Polytope.vc().triangulate(heights)`), not a "
                     "`CalabiYau`.  CalabiYau-only features — GV invariants, "
                     "mori_cone(version='cap'), kahler_cone(version='cup') and "
-                    "to_lcs_tree() — are unavailable for VEX and raise "
+                    "to_lcs_tree() — are unavailable for vex and raise "
                     "NotImplementedError.  Stored fast-path attributes remain valid.",
                     UserWarning,
                     stacklevel=2,
@@ -870,7 +931,7 @@ class ToricCYPhase(CYPhase):
         return self._cy
 
     def _require_calabiyau(self, feature: str) -> Any:
-        """Return the CYTools ``CalabiYau`` (FRST); raise for VEX (a toric ``Fan``)."""
+        """Return the CYTools ``CalabiYau`` (FRST); raise for vex (a toric ``Fan``)."""
         if self.mode != "frst":
             raise NotImplementedError(
                 f"{feature} requires a CYTools CalabiYau, available only for FRST "
@@ -886,7 +947,7 @@ class ToricCYPhase(CYPhase):
 
         Args:
             version (str): ``"toric"`` → the toric Mori cone
-                (FRST: ``CalabiYau.toric_mori_cone``; VEX: ``Fan.mori_cone`` with
+                (FRST: ``CalabiYau.toric_mori_cone``; vex: ``Fan.mori_cone`` with
                 ``pushed_down=True``).  ``"cap"`` → ``CalabiYau.mori_cone_cap``
                 (the single-geometry combinatorial Mori-cone cap; **FRST only**).
             in_basis (bool): Whether to express the cone in the GLSM basis.
@@ -895,14 +956,14 @@ class ToricCYPhase(CYPhase):
             cytools.cone.Cone: The requested Mori cone.
 
         Raises:
-            NotImplementedError: For ``version="cap"`` on a VEX phase.
+            NotImplementedError: For ``version="cap"`` on a vex phase.
             ValueError: If ``version`` is not ``"toric"`` or ``"cap"``.
         """
         if version == "toric":
             cy = self.to_cytools()
             if self.mode == "frst":
                 return cy.toric_mori_cone(in_basis=in_basis)
-            return cy.mori_cone(pushed_down=True, in_basis=in_basis)  # VEX Fan
+            return cy.mori_cone(pushed_down=True, in_basis=in_basis)  # vex Fan
         if version == "cap":
             cy = self._require_calabiyau("mori_cone(version='cap')")
             return cy.mori_cone_cap(in_basis=in_basis)
@@ -916,7 +977,7 @@ class ToricCYPhase(CYPhase):
         Args:
             version (str): ``"toric"`` → the toric Kähler cone
                 (FRST: ``CalabiYau.toric_kahler_cone``, always in the GLSM basis;
-                VEX: ``Fan.kahler_cone`` with ``pushed_down=True``).  ``"cup"`` →
+                vex: ``Fan.kahler_cone`` with ``pushed_down=True``).  ``"cup"`` →
                 :math:`K_{\cup}`, the dual of the Mori-cone cap,
                 ``Cone(cy.mori_cone_cap(in_basis=True).extremal_rays()).dual()``
                 (definition from ``jaxvacua.cytools_interface.compute_K_cup``;
@@ -929,14 +990,14 @@ class ToricCYPhase(CYPhase):
             cytools.cone.Cone: The requested Kähler cone.
 
         Raises:
-            NotImplementedError: For ``version="cup"`` on a VEX phase.
+            NotImplementedError: For ``version="cup"`` on a vex phase.
             ValueError: If ``version`` is not ``"toric"`` or ``"cup"``.
         """
         if version == "toric":
             cy = self.to_cytools()
             if self.mode == "frst":
                 return cy.toric_kahler_cone()
-            return cy.kahler_cone(pushed_down=True, in_basis=in_basis)  # VEX Fan
+            return cy.kahler_cone(pushed_down=True, in_basis=in_basis)  # vex Fan
         if version == "cup":
             cy = self._require_calabiyau("kahler_cone(version='cup')")
             cytools = _require_cytools()
@@ -957,7 +1018,7 @@ class ToricCYPhase(CYPhase):
             The GV invariants as returned by CYTools.
 
         Raises:
-            NotImplementedError: For a VEX phase (no ``CalabiYau``).
+            NotImplementedError: For a vex phase (no ``CalabiYau``).
         """
         cy = self._require_calabiyau("gv_invariants()")
         return cy.compute_gvs(**kwargs)
@@ -987,7 +1048,7 @@ class ToricCYPhase(CYPhase):
             jaxvacua.lcs.lcs_tree: The LCS-tree for the mirror CY.
 
         Raises:
-            NotImplementedError: For a VEX phase (no ``CalabiYau``).
+            NotImplementedError: For a vex phase (no ``CalabiYau``).
         """
         cy = self._require_calabiyau("to_lcs_tree()")
         lcs_tree = _require_lcs_tree()
@@ -1007,19 +1068,26 @@ class ToricCYPhase(CYPhase):
         non-deterministic ``Polytope(vertices)`` call and differed from the deterministic
         one for ~31% of h11=10 polytopes.
 
-        For VEX only κ is checked (c₂ is stored verbatim from the fan); calling this
-        materialises the ``Fan`` and therefore emits the VEX ``UserWarning``.
+        For vex only κ is checked (c₂ is stored verbatim from the fan); calling this
+        materialises the ``Fan`` and therefore emits the vex ``UserWarning``.
 
         Returns:
             bool: ``True`` iff the recompute matches the stored geometry.
         """
         cy = self.to_cytools()
-        basis_src = [int(b) + 1 for b in self.glsm_basis]        # stored is 0-indexed
+        # CYTools reports the AMBIENT geometry over prime toric divisors. Since schema 3 the
+        # stored geometry is over the *unfolded* divisor list, so for a non-favorable polytope
+        # the two are not directly comparable: contract the stored side over each reducible
+        # divisor's components first. That contraction is exactly the fold-back invariant the
+        # migration checks, so verify() re-establishes it against a fresh CYTools recompute.
+        prime_of = self._prime_label_map()
+        basis_src = [b + 1 for b in ([prime_of[int(x)] for x in self.glsm_basis]
+                     if self._geometry_is_unfolded else self._slice_basis)]
         if self.mode == "frst":
             coo_src = cy.intersection_numbers(in_basis=False, format="coo").tolist()
             c2_src = [int(x) for x in cy.second_chern_class(in_basis=False).tolist()]
         else:
-            # VEX: a Fan, pushed down to the prime toric divisors. Fan.intersection_numbers has
+            # vex: a Fan, pushed down to the prime toric divisors. Fan.intersection_numbers has
             # no ``format`` argument -- it returns a {index-tuple: value} dict -- so rebuild the
             # COO exactly as the generator did (run_frst_class.py:266-268).
             d_int = cy.intersection_numbers(pushed_down=True, in_basis=False, as_np_array=False)
@@ -1029,20 +1097,52 @@ class ToricCYPhase(CYPhase):
             c2_src = [int(x) for x in np.rint(np.array(cy.c2())).astype(int).tolist()]
         norm = nz.normalize_geometry(self.mode, coo_src, c2_src, basis_src)
 
-        # (a) basis-independent: the normalized out-of-basis tensor itself
-        kappa_ok = (nz._canonicalize_coo(norm["coo"])
-                    == nz._canonicalize_coo(np.asarray(self._coo).tolist()))
-        c2_ok = [int(x) for x in norm["c2"]] == [int(x) for x in self._c2]
-        # (b) the in-basis slice, taken with the SAME (stored) basis on both sides
-        r_ib, r_c2 = nz.in_basis_from_stored(norm["coo"], norm["c2"], self.glsm_basis)
-        mine_ib = self.intersection_numbers(in_basis=True, format="coo").tolist()
+        # (a) basis-independent: the normalized out-of-basis tensor, after folding the stored
+        #     side back onto the prime toric divisors
+        mine_coo, mine_c2 = (self._fold_to_prime_toric() if self._geometry_is_unfolded
+                             else (np.asarray(self._coo).tolist(),
+                                   [int(x) for x in self._c2]))
+        kappa_ok = (nz._canonicalize_coo(norm["coo"]) == nz._canonicalize_coo(mine_coo))
+        c2_ok = [int(x) for x in norm["c2"]] == [int(x) for x in mine_c2]
+        # (b) the in-basis slice, both sides over the ambient prime-toric basis
+        amb = ([prime_of[int(b)] for b in self.glsm_basis]
+               if self._geometry_is_unfolded else list(self._slice_basis))
+        r_ib, r_c2 = nz.in_basis_from_stored(norm["coo"], norm["c2"], amb)
+        mine_ib, mine_ib_c2 = nz.in_basis_from_stored(mine_coo, mine_c2, amb)
+        mine_ib = np.asarray(mine_ib).tolist()
         ib_ok = (sorted(tuple(int(x) for x in row) for row in r_ib)
                  == sorted(tuple(int(x) for x in row) for row in mine_ib)
                  and np.array_equal(np.asarray(r_c2, dtype=int),
-                                    self.second_chern_class(in_basis=True)))
+                                    np.asarray(mine_ib_c2, dtype=int)))
         if self.mode != "frst":
-            c2_ok = True                       # VEX c₂ stored verbatim from the fan
+            c2_ok = True                       # vex c₂ stored verbatim from the fan
         return bool(kappa_ok and c2_ok and ib_ok)
+
+    def _prime_label_map(self) -> List[int]:
+        """Unfolded position -> 0-indexed prime toric divisor.
+
+        Identity when the polytope is favorable. When a divisor splits into ``g+1`` components
+        they occupy ``g+1`` consecutive unfolded positions that all map back to it.
+        """
+        nc = self.n_components or [1] * self.oob_dim
+        return [i for i, n in enumerate(nc) for _ in range(int(n))]
+
+    def _fold_to_prime_toric(self):
+        """Contract the stored geometry back onto the prime toric divisors.
+
+        Inverse of the build-time unfolding: summing a reducible divisor's components
+        reproduces the ambient value, which is what CYTools computes.
+        """
+        lab = self._prime_label_map()
+        agg = {}
+        for a, b, c, v in np.asarray(self._coo, dtype=int).reshape(-1, 4):
+            key = tuple(sorted((lab[int(a)], lab[int(b)], lab[int(c)])))
+            agg[key] = agg.get(key, 0) + int(v)
+        c2 = [0] * (max(lab) + 1)
+        for pos, v in enumerate(self._c2):
+            c2[lab[pos]] += int(v)
+        coo = [[*k, v] for k, v in sorted(agg.items()) if v]
+        return coo, c2
 
     def __repr__(self) -> str:
         return (

@@ -1,11 +1,11 @@
 r"""
-Normalization and deterministic identifiers for the FRST/VEX cy-database build.
+Normalization and deterministic identifiers for the FRST/vex cy-database build.
 
-This module converts the two source conventions (FRST vs VEX; see the build plan)
+This module converts the two source conventions (FRST vs vex; see the build plan)
 into **one** stored convention — the prime toric divisors, **0-indexed** — and
 provides the reproducible identifiers used throughout the build.
 
-**Stored (normalized) convention (D2), identical for FRST and VEX.** Positions
+**Stored (normalized) convention (D2), identical for FRST and vex.** Positions
 `0 … Ntor-1` correspond to prime toric divisor labels `1 … Ntor`
 (`Ntor = basis_dim + 4`; favorable ⇒ `basis_dim = h11`). Intersection *numbers*
 are unchanged; only the index layout is unified:
@@ -15,7 +15,7 @@ are unchanged; only the index layout is unified:
   dropped value as scalar ``c2_origin = c2_src[0]``; from the COO drop every
   triple containing label 0 and remap the survivors ``L → L-1``;
   ``basis = basis_src - 1``.
-- **VEX source → normalized** (source COO uses labels `1 … Ntor`, ``c2`` is the
+- **vex source → normalized** (source COO uses labels `1 … Ntor`, ``c2`` is the
   0-indexed array over `1 … Ntor`): ``c2 = c2_src`` (``c2_origin = None``); remap
   the COO ``L → L-1``; ``basis = basis_src - 1``.
 
@@ -48,7 +48,7 @@ CONVENTION = "prime-toric-0indexed-v1"
 #: It lives here rather than in the builder because this module is the only one both the
 #: writer (``build_toric_database``) and the reader (``toric_db``) can import — the builder
 #: pulls in ``cytools`` at module scope and so must never be imported by the consumer.
-TORIC_SCHEMA_VERSION = 2
+TORIC_SCHEMA_VERSION = 3
 
 #: What changed in each ``toric`` schema version, surfaced in the reader's error message so a
 #: user with a stale cache is told what to do.
@@ -56,6 +56,16 @@ TORIC_SCHEMA_CHANGELOG = {
     1: "initial toric layout (monolithic catalogs)",
     2: "sharded per-h11 catalogs + _ksid_index; thin phase catalog (no polytope_hash/phase_id; "
        "binary wall_hash); map-verified ks_id; real provenance; streaming/resumable build.",
+    3: "non-favorable unfolding. kappa/c2 are stored over the UNFOLDED divisor list (one entry "
+       "per irreducible component of each prime toric divisor; arXiv:1712.04946), so they span "
+       "all of H^(1,1)(X). `polytope` gains `cy_basis` (the h11-dimensional slicing basis, "
+       "replacing `glsm_basis`, whose ambient prefix is `cy_basis[:basis_dim]`) and "
+       "`n_components`; `polytope_catalog.oob_dim` becomes the unfolded count. Favorable rows "
+       "are unchanged bit-for-bit -- they are the degenerate case with every n_components == 1. "
+       "`triang_id` and `ks_id` are preserved; `wall_hash` is recomputed for unfolded rows. The "
+       "split requires chi(O_D) = g+1 for each reducible divisor; vex phases where that "
+       "measurably fails keep the ambient truncation, so read the divisor count from the "
+       "geometry (len(c2) == sum(n_components)), not from oob_dim.",
 }
 
 COO = List[Tuple[int, int, int, int]]  # list of (i, j, k, value), 0-indexed positions
@@ -111,9 +121,9 @@ def normalize_geometry(
     **Arguments:**
     - ``dataset``: ``"frst"`` or ``"vex"``.
     - ``coo_src``: out-of-basis κ as a COO list of ``[i, j, k, value]`` in the
-      source label convention (FRST: labels ``0…Ntor``; VEX: labels ``1…Ntor``).
+      source label convention (FRST: labels ``0…Ntor``; vex: labels ``1…Ntor``).
     - ``c2_src``: out-of-basis c₂ (FRST: length ``Ntor+1``, index 0 = origin;
-      VEX: length ``Ntor``, 0-indexed over labels ``1…Ntor``).
+      vex: length ``Ntor``, 0-indexed over labels ``1…Ntor``).
     - ``basis_src``: GLSM basis divisor labels.
 
     **Returns:** dict with

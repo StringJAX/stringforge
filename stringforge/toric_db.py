@@ -1,5 +1,5 @@
 r"""
-Consumer for the unified, **sharded** ``toric`` cy-database sub-dataset (FRST + VEX).
+Consumer for the unified, **sharded** ``toric`` cy-database sub-dataset (FRST + vex).
 
 ``ToricCYDatabase`` subclasses :class:`stringforge.cy_io.CYDatabase`, but note that the
 inheritance is *nominal*: the base class assumes a monolithic ``{dataset}/catalog.parquet``,
@@ -17,7 +17,7 @@ everything as per-h11 **sharded** parts, so the catalog is never loaded whole:
 
 The **thin** phase catalog omits ``polytope_hash`` (joined via ``ks_id`` from the polytope catalog on
 :meth:`load`) and ``phase_id`` (derived ``"{mode}:{h11}:{ks_id}:{triang_id}"``); ``wall_hash`` is a
-32-byte digest, exposed as ``.hex()``. Per-polytope VEX counts live in ``polytope_vex_counts`` and are
+32-byte digest, exposed as ``.hex()``. Per-polytope vex counts live in ``polytope_vex_counts`` and are
 left-joined by :meth:`query_polytopes`.
 
 **Access is currently local only** (:meth:`~stringforge.cy_io.CYDatabase.from_local`);
@@ -34,6 +34,7 @@ lazy download of the sharded layout from the Hub is not yet implemented. Example
 from __future__ import annotations
 
 import glob
+import re
 import json
 import warnings
 from typing import Dict, Optional, Tuple
@@ -47,8 +48,36 @@ from . import toric_normalize as nz
 _MODES = ("frst", "vex")
 
 
+def _part_files(split_dir) -> list:
+    """Every ``data-*.parquet`` of a split, in whichever layout it is stored.
+
+    Two layouts are in use and both must be readable:
+
+    * **flat** -- ``frst/catalog/h11_10/data-00042.parquet`` (h11 <= 11)
+    * **per-chunk** -- ``frst/catalog/h11_12/c014/data-32256.parquet`` (h11 = 12 onward)
+
+    The nesting exists because Hugging Face caps a git directory at 10,000 files, and h11 = 12
+    holds ~26,000 parts per split. Sequence numbers are unique bucket-wide, so the layouts can
+    coexist and the sort below is a total order either way.
+    """
+    import glob as _g
+    return sorted(_g.glob(str(split_dir / "data-*.parquet"))
+                  + _g.glob(str(split_dir / "c[0-9][0-9][0-9]" / "data-*.parquet")),
+                  key=lambda f: int(re.search(r"data-(\d+)", f).group(1)))
+
+
+def _part_file(split_dir, part: int):
+    """Path of a single part by sequence number, flat or nested (see :func:`_part_files`)."""
+    import glob as _g
+    flat = split_dir / f"data-{part:05d}.parquet"
+    if flat.exists():
+        return flat
+    hits = _g.glob(str(split_dir / "c[0-9][0-9][0-9]" / f"data-{part:05d}.parquet"))
+    return hits[0] if hits else flat
+
+
 class ToricCYDatabase(cy_io.CYDatabase):
-    """Consumer for the sharded ``toric`` sub-dataset (shared polytopes; FRST/VEX phases)."""
+    """Consumer for the sharded ``toric`` sub-dataset (shared polytopes; FRST/vex phases)."""
 
     _DATASET = "toric"
 
@@ -168,14 +197,14 @@ class ToricCYDatabase(cy_io.CYDatabase):
             if not pcat.is_dir():
                 continue
             n_poly = sum(_pq.ParquetFile(f).metadata.num_rows
-                         for f in sorted(glob.glob(str(pcat / "data-*.parquet"))))
+                         for f in _part_files(pcat))
             per_mode = {}
             for mode in _MODES:
                 gdir = self._sdir(mode, "geom", f"h11_{h11}")
                 if gdir.is_dir():
                     per_mode[mode] = sum(
                         _pq.ParquetFile(f).metadata.num_rows
-                        for f in sorted(glob.glob(str(gdir / "data-*.parquet")))
+                        for f in _part_files(gdir)
                     )
             rows.append((h11, n_poly, per_mode))
         if not rows:
@@ -218,7 +247,7 @@ class ToricCYDatabase(cy_io.CYDatabase):
         (e.g. ``HfFileSystem``) it range-downloads only those row groups. Per-record I/O ≈ one row
         group (``ROW_GROUP_SIZE`` rows), independent of the part/file size.
         """
-        pf = pq.ParquetFile(split_dir / f"data-{part:05d}.parquet")
+        pf = pq.ParquetFile(_part_file(split_dir, part))
         if pf.num_row_groups <= 1:
             return pf.read().slice(row0, n)
         lo, hi = row0, row0 + n
@@ -245,7 +274,7 @@ class ToricCYDatabase(cy_io.CYDatabase):
                 except Exception:  # noqa: BLE001
                     ds = None
             if ds is None:
-                files = sorted(glob.glob(str(split_dir / "data-*.parquet")))
+                files = _part_files(split_dir)
                 ds = pds.dataset(files, format="parquet")
             self._ds_cache[key] = ds
         return self._ds_cache[key]
@@ -300,7 +329,7 @@ class ToricCYDatabase(cy_io.CYDatabase):
 
     def query_polytopes(self, h11: int, ks_id=None, h12=None, fav_N=None, fav_M=None,
                         trilayer=None) -> pd.DataFrame:
-        """Shared per-polytope catalog for one h11 (FRST counts + left-joined VEX counts)."""
+        """Shared per-polytope catalog for one h11 (FRST counts + left-joined vex counts)."""
         pdir = self._sdir("polytope_catalog", f"h11_{h11}")
         if ks_id is not None:
             idx = self._index(pdir)
@@ -315,7 +344,7 @@ class ToricCYDatabase(cy_io.CYDatabase):
 
     def _join_vex_counts(self, h11: int, df: pd.DataFrame) -> pd.DataFrame:
         vdir = self._sdir("polytope_vex_counts", f"h11_{h11}")
-        files = sorted(glob.glob(str(vdir / "data-*.parquet"))) if vdir.is_dir() else []
+        files = _part_files(vdir) if vdir.is_dir() else []
         if len(df) and files:
             v = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
             df = df.merge(v[["ks_id", "n_vex", "n_vex_classes"]], on="ks_id", how="left")
@@ -328,8 +357,8 @@ class ToricCYDatabase(cy_io.CYDatabase):
     def get_polytope(self, *, h11: int, ks_id: int) -> dict:  # type: ignore[override]
         r"""
         **Description:**
-        Shared ``polytope`` record (vertices, glsm_basis, charge matrix, hash) via the index.
-        There is no ``mode``: the polytope layer is shared between FRST and VEX.
+        Shared ``polytope`` record (vertices, cy_basis, charge matrix, hash) via the index.
+        There is no ``mode``: the polytope layer is shared between FRST and vex.
 
         **Keyword-only, deliberately.** The inherited
         :meth:`~stringforge.cy_io.CYDatabase.get_polytope` takes ``(ks_id, h11, ...)`` — the
@@ -355,15 +384,23 @@ class ToricCYDatabase(cy_io.CYDatabase):
         return {
             "h11": h11, "ks_id": ks_id, "polytope_hash": r["polytope_hash"],
             "vertices": np.asarray(g["vertices"]),
-            "glsm_basis": [int(x) for x in g["glsm_basis"]],
+            # Schema 3: one basis column. `cy_basis` spans H^{1,1}(X) (len == h11); the ambient
+            # GLSM sub-basis is its first `basis_dim` entries, and that prefix -- NOT all of
+            # cy_basis -- is what indexes the rows of `glsm_charge_matrix`.
+            "cy_basis": [int(x) for x in g["cy_basis"]],
+            "n_components": [int(x) for x in g["n_components"]],
             "glsm_charge_matrix": np.asarray([list(x) for x in g["glsm_charge_matrix"]]),
             "fav_N": bool(r["fav_N"]), "fav_M": bool(r["fav_M"]), "trilayer": bool(r["trilayer"]),
             "oob_dim": int(r["oob_dim"]), "basis_dim": int(r["basis_dim"]),
         }
 
     def load(self, mode: str, h11: int, ks_id: int, triang_id: int, in_basis: bool = False) -> dict:
-        """Load one phase's geometry from ``{mode}`` (O(1) via the index). ``in_basis`` uses the
-        shared ``glsm_basis``; ``polytope_hash`` joined from the polytope catalog; ``wall_hash`` bytes.
+        """Load one phase's geometry from ``{mode}`` (O(1) via the index).
+
+        ``in_basis`` slices with the shared ``cy_basis``, so the result always spans
+        :math:`H^{1,1}(X)` -- for a non-favorable polytope this includes the components of
+        reducible prime toric divisors, which the ambient GLSM basis cannot see.
+        ``polytope_hash`` is joined from the polytope catalog; ``wall_hash`` is raw bytes.
         """
         self._check_mode(mode)
         cdir = self._sdir(mode, "catalog", f"h11_{h11}")
@@ -394,7 +431,7 @@ class ToricCYDatabase(cy_io.CYDatabase):
             "c2_origin": (int(g["c2_origin"]) if g["c2_origin"] is not None else None),
         }
         if in_basis:
-            ib_coo, ib_c2 = nz.in_basis_from_stored(coo, c2, poly["glsm_basis"])
+            ib_coo, ib_c2 = nz.in_basis_from_stored(coo, c2, poly["cy_basis"])
             out["intnums_coo_in_basis"] = np.asarray(ib_coo, dtype=int).reshape(-1, 4)
             out["c2_in_basis"] = np.asarray(ib_c2, dtype=int)
         return out
