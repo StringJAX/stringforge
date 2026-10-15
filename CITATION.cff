@@ -8,8 +8,8 @@ title: "StringForge: shared infrastructure for string-compactification workflows
 authors:
   - family-names: Schachner
     given-names: Andreas
-version: 0.1.1
-date-released: 2026-05-25
+version: 0.1.2
+date-released: 2026-10-15
 license: GPL-3.0-only
 repository-code: "https://github.com/StringJAX/stringforge"
 abstract: >-

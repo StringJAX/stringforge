@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stringforge"
-version = "0.1.1"
+version = "0.1.2"
 description = "Shared database, model-loading, and vacua-vault infrastructure for string compactifications."
 requires-python = ">=3.12"
 dependencies = [
@@ -15,7 +15,7 @@ dependencies = [
     "pyarrow",
     "huggingface_hub",
     "jaxpolylog>=0.3.0",
-    "jaxvacua>=0.1.1",
+    "jaxvacua>=0.1.2",
 ]
 # Fields below are still owned by setup.py; declaring them dynamic
 # lets setuptools accept the values without rejecting the build.
