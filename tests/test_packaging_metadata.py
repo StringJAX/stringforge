@@ -18,11 +18,15 @@ def test_declared_versions_are_consistent():
         (REPO_ROOT / "pyproject.toml").read_text()
     )
     conf_text = (REPO_ROOT / "documentation" / "source" / "conf.py").read_text()
+    citation = re.search(r"^version:\s*(\S+)\s*$",
+                         (REPO_ROOT / "CITATION.cff").read_text(), re.M)
+    assert citation is not None, "Could not find 'version:' in CITATION.cff."
 
     versions = {
         "__init__.py": _extract_assignment(init_text, "__version__"),
         "pyproject.toml": pyproject_data["project"]["version"],
         "documentation/source/conf.py": _extract_assignment(conf_text, "version"),
+        "CITATION.cff": citation.group(1),
     }
 
     assert len(set(versions.values())) == 1, versions

@@ -31,7 +31,7 @@ logging.Logger._log = _filtered_log
 project = "StringForge"
 copyright = "2026, Andreas Schachner"
 author = "Andreas Schachner"
-version = "0.1.2"
+version = "0.1.3"
 release = version
 
 # -- General configuration ---------------------------------------------------

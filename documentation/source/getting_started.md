@@ -11,7 +11,7 @@ importantly [JAXVacua](https://jaxvacua.readthedocs.io).
 [JAX with CUDA support](https://github.com/jax-ml/jax#installation) first.
 
 ```bash
-# Recommended once public on PyPI
+# From PyPI
 pip install stringforge
 
 # Development install from a local clone

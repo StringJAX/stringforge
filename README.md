@@ -154,7 +154,7 @@ print(designated[["label", "n_vacua", "created"]])
 **Prerequisites:** Python >= 3.12. If GPU acceleration is needed, install [JAX with CUDA support](https://github.com/jax-ml/jax#installation) first.
 
 ```bash
-# Recommended once the package is public on PyPI
+# From PyPI
 pip install stringforge
 
 # Development install from a local clone
@@ -186,8 +186,7 @@ Core dependencies installed by `pip`:
 - Pandas and PyArrow
 - HuggingFace Hub
 - JAX and jaxlib
-- JAXPolyLog
-- JAXVacua
+- JAXVacua (which brings JAXPolyLog)
 
 Optional workflow dependencies:
 
@@ -216,7 +215,7 @@ If you find this work useful, please cite the companion paper as the **primary**
   author = {Schachner, Andreas},
   title = {StringForge: shared infrastructure for string-compactification workflows},
   year = {2026},
-  version = {0.1.0},
+  version = {0.1.3},
   url = {https://github.com/StringJAX/stringforge}
 }
 ```
@@ -240,7 +239,8 @@ If you find this work useful, please cite the companion paper as the **primary**
 
 ## License
 
-StringForge is released under the [GNU General Public License v3.0](LICENSE).
+StringForge is released under the [GNU General Public License](LICENSE), version 3 or (at your option)
+any later version (GPL-3.0-or-later).
 
 ## Contact
 

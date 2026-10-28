@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased] — 0.1.3 (prepared 2026-10-28; not yet tagged)
+
+Packaging metadata only; no code change. The first PyPI release since 0.1.1: it carries the changes
+listed under 0.1.2, which was tagged (`v0.1.2`, `1349f16`) but never reached PyPI.
+
+### Changed
+- Licence: **GPL-3.0-or-later** in `setup.py`, `CITATION.cff` and the README, matching the source
+  headers ("or (at your option) any later version") and the rest of the StringJAX family. 0.1.0–0.1.2
+  declared GPL-3.0-only. Classifiers "GNU General Public License v3 or later (GPLv3+)" and Python 3.13
+  (tested in CI) added.
+- The dependency on `jaxpolylog` is dropped: stringforge never imports it. It still arrives through
+  `jaxvacua`, which requires `jaxpolylog>=0.4.0` from 0.1.3 on.
+
+### Release notes
+- 0.1.2 is not on PyPI: the tag-triggered workflow `release.yml` failed in its "Publish to PyPI" step for
+  `v0.1.0`, `v0.1.1` and `v0.1.2` (GitHub Actions runs of 2026-06-11 and 2026-10-15), each time at
+  authentication, before any upload. For `v0.1.0` and `v0.1.1` the workflow used PyPI Trusted Publishing
+  and PyPI had no matching publisher (`invalid-publisher`); for `v0.1.2` it passed
+  `secrets.PYPI_API_TOKEN`, which was empty, so the action fell back to Trusted Publishing without the
+  `id-token: write` permission. 0.1.0 and 0.1.1 were uploaded by hand. A tag push publishes only once the
+  secret is set or a Trusted Publisher is configured.
+
 ## 0.1.2 - 2026-10-15
 
 ### Added
@@ -20,7 +42,16 @@
 - `LCSDatabase.load` passed a zero Kähler-moduli count straight through to `jaxvacua`, which built an empty (0, 0, 0) intersection tensor and then indexed into it, surfacing a bare `IndexError`. The `cicy` list's 22 degenerate *product* entries hit exactly this. The condition is now caught with a message naming the cause; the pre-existing zero-Hodge-number warning is kept for the cases that remain loadable.
 - The toric `_check_schema` was a no-op that accepted **any** `schema.json` version, including a future incompatible one; it now validates against `TORIC_SCHEMA_VERSION` and raises `SchemaVersionError` on a mismatch, warning only when the file is absent or unversioned.
 
+## 0.1.1 - 2026-06-11
+
+### Changed
+- Dependency floors: `jaxvacua>=0.1.1` and `jaxpolylog>=0.3.0` (previously unpinned).
+- `release.yml` publishes with `skip-existing: true`, meant to let a tag pushed after a manual upload pass
+  over the existing files. (The `v0.1.1` run still failed, earlier, at authentication; see 0.1.3.)
+
 ## 0.1.0 - 2026-05-25
+
+(Prepared 2026-05-25; tagged `v0.1.0` and uploaded to PyPI on 2026-06-11.)
 
 Initial public-release preparation for StringForge.
 
