@@ -2,11 +2,12 @@
 
 ## [Unreleased]
 
-### Removed
-- The tag-triggered release workflow `.github/workflows/release.yml`. It never published a release: every
-  run (`v0.1.0` to `v0.1.3`) failed at authentication (see 0.1.3); every version on PyPI was uploaded by hand.
-  Releases are now built, checked (`twine check`) and uploaded with `twine` by hand, as for jaxvacua and
-  jaxpolylog.
+### Changed
+- The release workflow `.github/workflows/release.yml` is rewritten. The old one never published a release:
+  every run (`v0.1.0` to `v0.1.3`) failed at authentication (see 0.1.3), and every version on PyPI was
+  uploaded by hand. The new one, shared by the StringJAX packages, publishes through Trusted Publishing (no
+  API token): pushing a tag `vX.Y.Z` builds the sdist and wheel, runs `twine check --strict`, refuses a tag
+  that differs from the built version, and publishes. Run by hand, it builds and checks without publishing.
 
 ## 0.1.3 - 2026-10-28
 

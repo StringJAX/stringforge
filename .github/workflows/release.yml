@@ -1,0 +1,81 @@
+name: release
+
+# Build, check and publish the package to PyPI when a version tag `vX.Y.Z` is pushed.
+#
+# Publishing uses PyPI Trusted Publishing: no API token is stored anywhere. Once per
+# project, the PyPI project's Settings -> Publishing must name this repository (owner
+# StringJAX), the workflow file `release.yml` and the environment `pypi`.
+#
+# Release flow:
+#   1. set the version in the package metadata and date the CHANGELOG entry;
+#      commit and push to main
+#   2. git tag -a vX.Y.Z -m "<package> X.Y.Z" && git push origin vX.Y.Z
+#
+# The build job refuses a tag that differs from the built version (write the tag
+# with the normalised version, e.g. v0.2.0rc1, as in the wheel's file name).
+# Running the workflow by hand (Actions -> release -> Run workflow) builds and checks
+# without publishing, whichever branch or tag it is started on. PyPI never accepts
+# a file twice, so re-publishing an existing version fails.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      - name: Check metadata
+        run: python -m twine check --strict dist/*
+
+      - name: The tag matches the built version
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: |
+          wheels=(dist/*.whl)
+          if [ "${#wheels[@]}" -ne 1 ]; then
+            echo "::error::expected one wheel, found ${#wheels[@]}"; exit 1
+          fi
+          built=$(basename "${wheels[0]}" | cut -d- -f2)
+          if [ "$built" != "${GITHUB_REF_NAME#v}" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the built version $built"; exit 1
+          fi
+          echo "tag $GITHUB_REF_NAME matches the built version $built"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    # only a pushed tag publishes; a manual run, even one started on a tag, does not
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
