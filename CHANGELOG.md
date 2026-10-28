@@ -1,6 +1,17 @@
 # Changelog
 
-## [Unreleased] — 0.1.3 (prepared 2026-10-28; not yet tagged)
+## [Unreleased]
+
+### Removed
+- The tag-triggered release workflow `.github/workflows/release.yml`. It never published a release: every
+  run (`v0.1.0` to `v0.1.3`) failed at authentication (see 0.1.3); every version on PyPI was uploaded by hand.
+  Releases are now built, checked (`twine check`) and uploaded with `twine` by hand, as for jaxvacua and
+  jaxpolylog.
+
+## 0.1.3 - 2026-10-28
+
+(Tagged `v0.1.3` and uploaded to PyPI by hand on 2026-10-28; the `v0.1.3` run of `release.yml` failed at
+authentication like the earlier ones.)
 
 Packaging metadata only; no code change. The first PyPI release since 0.1.1: it carries the changes
 listed under 0.1.2, which was tagged (`v0.1.2`, `1349f16`) but never reached PyPI.
